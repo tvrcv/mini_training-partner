@@ -10,7 +10,7 @@
   const POLICY_DEFAULTS = {
     enabled: true,
     mode: "inline",               // "inline": tip beside the message box, never blocks. "confirm": also hold severe mismatches once on send.
-    costFraming: "dollars",       // "dollars" (usage-based billing) or "allowance" (seat plans: talk about usage limits, not money)
+    costFraming: "allowance",     // "allowance" (default; plan usage limits and tokens) or "dollars" (firms billed per token)
     baselineModel: null,          // null = use shared config baseline
     baselineEffort: null,
     minSeverity: 2,
@@ -178,7 +178,7 @@
     let saving = "";
     if (ratio >= 1.5) {
       saving = cfg.policy.costFraming === "allowance"
-        ? ", and uses roughly " + Math.round(ratio) + "× less of your usage allowance"
+        ? ", and uses roughly " + Math.round(ratio) + "× less of your usage limit (estimate)"
         : ", at about " + Math.round(100 * (1 - 1 / ratio)) + "% lower cost";
     }
     const steps = [];
@@ -255,8 +255,11 @@
     const base = labelOf(cfg, priced.baseKey) + " at " + cfg.baseline.effort + " effort";
     if (cfg.policy.costFraming === "allowance") {
       const ratio = priced.cost > 0 ? priced.baselineCost / priced.cost : 1;
-      return (opener ? opener + " " : "") + "That reply on " + labelOf(cfg, modelKey) + " used roughly " + Math.max(1, Math.round(ratio)) +
-        "× less of your usage allowance than " + base + " would have (estimate).";
+      const u = priced.usage, tokens = (u.input || 0) + (u.output || 0) + (u.cache_read || 0) + (u.cache_write || 0);
+      const tk = tokens >= 1000 ? Math.round(tokens / 1000) + "k" : String(tokens);
+      return (opener ? opener + " " : "") + "That reply on " + labelOf(cfg, modelKey) + " used about " + tk +
+        " tokens, roughly " + Math.max(1, Math.round(ratio)) + "× less of your usage limit than " + base +
+        " would have (estimates).";
     }
     return (opener ? opener + " " : "") + "That reply on " + labelOf(cfg, modelKey) + " cost " + (priced.cost < 0.01 ? "under " + (cfg.currency_symbol || "$") + "0.01" : "about " + fmtMoney(cfg, priced.cost)) +
       ", roughly " + fmtMoney(cfg, priced.savings) + " less than " + base + ". You've saved the business ≈" +

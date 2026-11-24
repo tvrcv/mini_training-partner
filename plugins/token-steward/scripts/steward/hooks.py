@@ -17,6 +17,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 from . import classifier, detect, pricing, store, transcript
+from . import usage as plan_usage
 
 PREFIX = "Token Steward · "
 
@@ -90,6 +91,7 @@ def _build_nudge(cfg, state, task_class, matched, model_key, effort, rec, model_
     rec_model = pricing.model_for_tier(cfg, rec["tier"]) if model_gap else model_key
     rec_effort = rec["effort"] if effort_gap else effort
     saving, pct = _estimate_saving(cfg, task_class, model_key, effort, rec_model, rec_effort)
+    ratio = 1 / (1 - pct / 100) if 0 < pct < 100 else None
 
     light = [m for m in matched if any(s["name"] == m and s["weight"] < 0 for s in cfg["classifier"]["signals"])]
     what = CLASS_PHRASES.get(task_class, "a lighter request")
@@ -106,9 +108,14 @@ def _build_nudge(cfg, state, task_class, matched, model_key, effort, rec, model_
 
     msg = (f"{PREFIX}This looks like {what}. You're on {current}, which is built for complex, "
            f"multi-step work. {target} typically handles requests like this just as well")
-    if saving >= 0.005 and pct > 0:
-        msg += f", at about {pct}% lower cost (≈{pricing.fmt_money(cfg, saving)} per request like this)"
+    if plan_usage.framing(cfg) == "dollars":
+        if saving >= 0.005 and pct > 0:
+            msg += f", at about {pct}% lower cost (≈{pricing.fmt_money(cfg, saving)} per request like this)"
+    elif plan_usage.ratio_text(ratio):
+        msg += f", and uses {plan_usage.ratio_text(ratio)} less of your usage limit (estimate)"
     msg += f". To switch for what follows: {' then '.join(steps)}."
+    if plan_usage.framing(cfg) == "usage" and plan_usage.limits_sentence():
+        msg += " " + plan_usage.limits_sentence()
     if "ultrathink" in (prompt or "").lower():
         msg += " Note: 'ultrathink' raises this prompt to maximum reasoning, which is rarely needed here."
     msg += " Your request is running as-is."
@@ -194,15 +201,23 @@ def on_session_start(cfg, inp):
     week_ago = time.time() - 7 * 86400
     week = [r for r in store.read_ledger_tail() if r.get("ts", 0) >= week_ago]
     week_saved = sum(max(r.get("savings", 0.0), 0.0) for r in week)
+    light = sum(1 for r in week if r.get("savings", 0) > 0)
     model_key = pricing.resolve_model(cfg, inp.get("model"))
     msg = (f"{PREFIX}Match the model to the task: Haiku for quick edits and lookups, Sonnet for "
            f"everyday drafting and coding, Opus or Fable for genuinely hard problems.")
     if model_key:
         msg += f" This session starts on {pricing.label_of(cfg, model_key)}."
-    if week_saved >= 0.01:
-        light = sum(1 for r in week if r.get("savings", 0) > 0)
-        msg += (f" Last 7 days: {pricing.fmt_money(cfg, week_saved)} saved across {light} right-sized "
-                f"task{'s' if light != 1 else ''}.")
+    if plan_usage.framing(cfg) == "dollars":
+        if week_saved >= 0.01:
+            msg += (f" Last 7 days: {pricing.fmt_money(cfg, week_saved)} saved across {light} right-sized "
+                    f"task{'s' if light != 1 else ''}.")
+    else:
+        if plan_usage.limits_sentence():
+            msg += " " + plan_usage.limits_sentence()
+        if week:
+            week_tokens = sum(plan_usage.total_tokens(r.get("tokens") or {}) for r in week)
+            msg += (f" Last 7 days: {plan_usage.tokens_text(week_tokens)} across {len(week)} "
+                    f"task{'s' if len(week) != 1 else ''}, {light} of them right-sized.")
     msg += " Playbook: /token-steward:guide"
     return {"systemMessage": msg}
 
@@ -348,6 +363,9 @@ def on_stop(cfg, inp):
         "nudged": bool(state.get("nudged_this_turn")),
         "nudge_accepted": accepted,
     }
+    limits = plan_usage.read_limits()
+    if limits:
+        record["limits_pct"] = {k: round(v["used_percentage"], 1) for k, v in limits.items()}
     store.append_ledger(record)
     totals = store.add_to_totals(record)
     state["session_cost"] += cost
@@ -359,11 +377,17 @@ def on_stop(cfg, inp):
     cel = cfg.get("celebrations") or {}
     celebration = ""
     if cel.get("enabled", True) and savings > 0:
-        after = totals["all_time"]["savings"]
-        reached = milestone_crossed(cel.get("milestones_usd", []), after - savings, after)
+        if plan_usage.framing(cfg) == "dollars":
+            after = totals["all_time"]["savings"]
+            reached = milestone_crossed(cel.get("milestones_usd", []), after - savings, after)
+            done = f"saved the firm {money(reached)}" if reached else ""
+        else:
+            after = totals["all_time"].get("right_sized", 0)
+            reached = milestone_crossed(cel.get("milestones_right_sized_tasks", []), after - 1, after)
+            done = f"right-sized {reached} tasks" if reached else ""
         if reached:
-            celebration = (f"\U0001F389 Milestone: you've now saved the firm {money(reached)} by right-sizing "
-                           f"your AI use. Thank you, this is exactly the habit that adds up. ")
+            celebration = (f"\U0001F389 Milestone: you've now {done}. Thank you, this is exactly the habit "
+                           f"that adds up. ")
         elif accepted and totals.get("nudges_accepted") == 1:
             celebration = "\U0001F389 Your first tip acted on. Thank you! "
 
@@ -374,11 +398,25 @@ def on_stop(cfg, inp):
         month = totals["by_month"].get(store.month_key(now), {}).get("savings", 0.0)
         opener = "" if celebration else "Thanks for switching, and for considering your usage. " if accepted \
             else "Thank you for considering your usage. "
-        msg = (f"{PREFIX}{celebration}{opener}This task ran on {pricing.label_of(cfg, primary)}"
-               f"{f' @ {effort}' if effort else ''} for {money(cost)}, about {money(savings)} less than "
-               f"{pricing.label_of(cfg, base_key)} @ {base['effort']}. You've saved the business "
-               f"{money(state['session_savings'])} this session, {money(month)} this month and "
-               f"{money(totals['all_time']['savings'])} in total.")
+        setup = f"{pricing.label_of(cfg, primary)}{f' @ {effort}' if effort else ''}"
+        reference = f"{pricing.label_of(cfg, base_key)} @ {base['effort']}"
+        if plan_usage.framing(cfg) == "dollars":
+            msg = (f"{PREFIX}{celebration}{opener}This task ran on {setup} for {money(cost)}, about "
+                   f"{money(savings)} less than {reference}. You've saved the business "
+                   f"{money(state['session_savings'])} this session, {money(month)} this month and "
+                   f"{money(totals['all_time']['savings'])} in total.")
+        else:
+            ratio = baseline_cost / cost if cost > 0 else None
+            week_ago = now - 7 * 86400
+            right_week = sum(1 for r in store.read_ledger_tail() if r.get("ts", 0) >= week_ago
+                             and r.get("savings", 0) > 0)
+            msg = (f"{PREFIX}{celebration}{opener}This task used {plan_usage.tokens_text(plan_usage.total_tokens(totals_usage))} "
+                   f"on {setup}")
+            if plan_usage.ratio_text(ratio):
+                msg += f", {plan_usage.ratio_text(ratio)} less of your usage limit than {reference} would take (estimate)"
+            msg += f". Right-sized tasks in the last 7 days: {right_week}."
+            if plan_usage.limits_sentence():
+                msg += " " + plan_usage.limits_sentence()
         out = {"systemMessage": msg}
         state["last_thanks_ts"] = now
 

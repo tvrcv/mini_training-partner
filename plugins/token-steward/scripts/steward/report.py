@@ -7,6 +7,7 @@ import time
 from collections import defaultdict
 
 from . import pricing, store
+from . import usage as plan_usage
 
 
 def _bucket(rows):
@@ -16,6 +17,53 @@ def _bucket(rows):
         out["baseline"] += r["baseline_cost"]
         out["savings"] += max(r["savings"], 0.0)
     return out
+
+
+def _usage_report(cfg, rows, totals, base_label):
+    now = time.time()
+    periods = [
+        ("Last 24 hours", [r for r in rows if now - r["ts"] < 86400]),
+        ("Last 7 days", [r for r in rows if now - r["ts"] < 7 * 86400]),
+        ("This month", [r for r in rows if store.month_key(r["ts"]) == store.month_key(now)]),
+        ("All time", rows),
+    ]
+    lines = ["# Your AI usage", ""]
+    limits = plan_usage.limits_sentence()
+    lines.append(limits if limits else
+                 "Session and weekly limit figures appear here once the Token Steward status line is on "
+                 "(run /token-steward:setup-statusline, Pro, Max and Ultra plans).")
+    lines += ["", f"\"Lighter\" compares each task with **{base_label}**, the firm's reference setup. "
+              "It is an estimate: Anthropic doesn't publish how fast each model uses up a limit, so "
+              "relative model price stands in for it.", "",
+              "| Period | Tasks | Right-sized | Tokens | Usage vs reference |",
+              "|---|---:|---:|---:|---:|"]
+    for name, rs in periods:
+        tokens = sum(plan_usage.total_tokens(r.get("tokens") or {}) for r in rs)
+        right = sum(1 for r in rs if r.get("savings", 0) > 0)
+        cost = sum(r["cost"] for r in rs)
+        base = sum(r["baseline_cost"] for r in rs)
+        ratio = f"{base / cost:.1f}\u00d7 lighter" if cost > 0 and base / cost >= 1.05 else "about the same"
+        lines.append(f"| {name} | {len(rs)} | {right} | {plan_usage.tokens_text(tokens)} | {ratio if rs else '-'} |")
+
+    mix = defaultdict(lambda: {"turns": 0, "tokens": 0})
+    for r in rows[-500:]:
+        key = f"{pricing.label_of(cfg, r['model'])} @ {r.get('effort') or '?'}"
+        mix[key]["turns"] += 1
+        mix[key]["tokens"] += plan_usage.total_tokens(r.get("tokens") or {})
+    lines += ["", "**Recent model mix** (last 500 tasks)", "",
+              "| Setup | Tasks | Tokens |", "|---|---:|---:|"]
+    for key, m in sorted(mix.items(), key=lambda kv: -kv[1]["turns"]):
+        lines.append(f"| {key} | {m['turns']} | {plan_usage.tokens_text(m['tokens'])} |")
+
+    light_on_premium = [r for r in rows[-200:] if r.get("task_class") in ("trivial", "routine") and r["tier"] >= 3]
+    shown, accepted = totals.get("nudges_shown", 0), totals.get("nudges_accepted", 0)
+    lines += ["", f"Tips shown: {shown} · acted on: {accepted}"
+              + (f" ({round(100 * accepted / shown)}%)" if shown else "")]
+    if light_on_premium:
+        lines.append(f"Of your last 200 tasks, {len(light_on_premium)} looked light but ran on Opus or Fable. "
+                     "Sonnet or Haiku would usually have done, and used less of your limit.")
+    lines += ["", "_Token counts are measured. \"Usage vs reference\" is an estimate; see the plugin's METHODOLOGY doc._"]
+    return "\n".join(lines)
 
 
 def savings_report(cfg):
@@ -28,6 +76,8 @@ def savings_report(cfg):
     if not rows:
         return ("Token Steward has no completed tasks recorded yet. Savings appear here after your "
                 "first few requests.")
+    if plan_usage.framing(cfg) == "usage":
+        return _usage_report(cfg, rows, totals, base_label)
 
     now = time.time()
     periods = [

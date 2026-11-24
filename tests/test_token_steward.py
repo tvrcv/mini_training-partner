@@ -280,8 +280,26 @@ class HookFlowTests(unittest.TestCase):
         self.assertEqual(milestone_crossed([1, 5, 10], 0.9, 1.2), 1)
         self.assertEqual(milestone_crossed([1, 5, 10], 4.0, 11.0), 10)
         self.assertIsNone(milestone_crossed([1, 5, 10], 1.2, 4.9))
+        # Usage framing (default): milestones count right-sized tasks.
         s = Session()
-        # A big right-sized task crosses the $1 milestone in one go.
+        override = Path(s.tmp.name) / "org.json"
+        override.write_text(json.dumps({"celebrations": {"milestones_right_sized_tasks": [2]}}))
+        env = s.env()
+        env["TOKEN_STEWARD_CONFIG"] = str(override)
+        s.env = lambda: env
+        s.turn("Summarise these notes for the partner", "claude-sonnet-5-5", "medium")
+        # The second right-sized task crosses the milestone; a milestone bypasses the thanks cooldown.
+        _, stop = s.turn("Summarise this memo for the partner", "claude-sonnet-5-5", "medium")
+        self.assertIn("Milestone: you've now right-sized 2 tasks", stop["systemMessage"])
+        self.assertNotIn("$", stop["systemMessage"])
+
+        # Dollar framing: a big right-sized task crosses the $1 milestone in one go.
+        s = Session()
+        override = Path(s.tmp.name) / "org.json"
+        override.write_text(json.dumps({"framing": "dollars"}))
+        env = s.env()
+        env["TOKEN_STEWARD_CONFIG"] = str(override)
+        s.env = lambda: env
         _, stop = s.turn("Summarise these 20 analyst reports for the partner", "claude-sonnet-5-5", "medium",
                          inp=200000, out=40000, cr=0)
         self.assertIn("Milestone", stop["systemMessage"])
@@ -292,7 +310,7 @@ class HookFlowTests(unittest.TestCase):
         s.turn("Summarise these 20 analyst reports for the partner", "claude-sonnet-5-5", "medium", inp=50000, out=5000)
         banner = s.hook("SessionStart", source="startup", model="claude-opus-5-5")
         self.assertIn("Last 7 days", banner["systemMessage"])
-        self.assertIn("1 right-sized task", banner["systemMessage"])
+        self.assertIn("across 1 task, 1 of them right-sized", banner["systemMessage"])
 
     def test_ledger_rotation_keeps_history(self):
         from steward import store
@@ -340,6 +358,46 @@ class HookFlowTests(unittest.TestCase):
         run("--data-dir", str(s.data), "snooze", "1")
         p, _ = s.turn("Rephrase this email to the client so it sounds more formal", "claude-opus-5-5", "high")
         self.assertEqual(p, {})
+
+    def test_limits_from_status_line_appear_in_tips(self):
+        s = Session()
+        # The status line script saves the plan-limit numbers Claude Code gives it.
+        status_in = {"model": {"display_name": "Opus 5.5"},
+                     "rate_limits": {"five_hour": {"used_percentage": 23.5, "resets_at": time.time() + 3600},
+                                     "seven_day": {"used_percentage": 41.2, "resets_at": time.time() + 86400}}}
+        out = subprocess.run([sys.executable, str(ROOT / "scripts" / "statusline.py")], input=json.dumps(status_in),
+                             capture_output=True, text=True, env=s.env(), timeout=20).stdout
+        self.assertIn("week 41%", out)
+        self.assertIn("session 24%", out)
+        s.turn("warm-up question about the deck", "claude-opus-5-5", "high")
+        p = s.hook("UserPromptSubmit", prompt="Rephrase this email to the client so it sounds more formal")
+        self.assertIn("41% of this week's limit", p["systemMessage"])
+        self.assertIn("less of your usage limit (estimate)", p["systemMessage"])
+        self.assertNotIn("$", p["systemMessage"])
+        rows = s.ledger()
+        self.assertEqual(rows[-1]["limits_pct"]["seven_day"], 41.2)
+
+    def test_setup_statusline(self):
+        s = Session(settings={"model": "opus"})
+        out = s.cli("setup-statusline")
+        self.assertIn("status line is on", out)
+        settings = json.loads((s.home / ".claude" / "settings.json").read_text())
+        self.assertEqual(settings["model"], "opus")  # other settings kept
+        self.assertIn("token-steward", settings["statusLine"]["command"])
+        self.assertTrue((s.home / ".claude" / "token-steward" / "statusline.py").exists())
+        # Never replaces someone else's status line.
+        s2 = Session(settings={"statusLine": {"type": "command", "command": "my-line.sh"}})
+        self.assertIn("already have a status line", s2.cli("setup-statusline"))
+        kept = json.loads((s2.home / ".claude" / "settings.json").read_text())
+        self.assertEqual(kept["statusLine"]["command"], "my-line.sh")
+
+    def test_status_line_without_limits(self):
+        s = Session()
+        out = subprocess.run([sys.executable, str(ROOT / "scripts" / "statusline.py")],
+                             input=json.dumps({"model": {"display_name": "Sonnet 5.5"}}),
+                             capture_output=True, text=True, env=s.env(), timeout=20).stdout
+        self.assertIn("Sonnet 5.5", out)
+        self.assertIn("limits appear after the first reply", out)
 
     def test_fails_open_on_garbage(self):
         s = Session()

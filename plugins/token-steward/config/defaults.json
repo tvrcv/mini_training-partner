@@ -1,6 +1,9 @@
 {
   "_comment": "Token Steward defaults. Org admins: override any key by pointing TOKEN_STEWARD_CONFIG at a JSON file (deep-merged over this one), or fork this file. Prices are USD per 1M tokens, Anthropic first-party API list prices as of 2026-11. Update when pricing changes or if you buy through Bedrock/Vertex/an enterprise agreement.",
 
+  "_framing_comment": "'usage' (default): messages talk about tokens and your plan's session and weekly limits, which is what matters on Pro, Max, Team and seat-based Enterprise plans. 'dollars': messages quote API list-price cost and savings, for firms that pay per token (API keys, usage-based billing, Bedrock, Vertex).",
+  "framing": "usage",
+
   "currency_symbol": "$",
 
   "pricing": {

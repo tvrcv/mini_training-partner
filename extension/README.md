@@ -44,8 +44,8 @@ It uses the same pricing, reference configuration and classifier as the Claude C
 
 Set **`costFraming`** to match how your firm pays for claude.ai:
 
+- `allowance` (default) for seat-based plans. Messages talk about tokens and stretching usage limits, never dollars. A lighter model on a seat plan doesn't reduce the invoice, so quoting money there would be misleading.
 - `dollars` for usage-based billing. Messages show estimated savings in money.
-- `allowance` for seat-based plans. Messages talk about stretching usage limits, never dollars. A lighter model on a seat plan doesn't reduce the invoice, so quoting money there would be misleading.
 
 `mode: "confirm"` additionally holds a send **once** for severe mismatches (by default, a trivial request at maximum settings on a top-tier model), with *Send as-is* and *I'll switch first*. We recommend leaving it on `inline`.
 

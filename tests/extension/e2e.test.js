@@ -98,7 +98,9 @@ test("tip while typing, no block on send, thanks after switching", { timeout: 60
     assert.ok(thanks, "thank-you toast should appear");
     assert.match(thanks, /Thank/);
     assert.doesNotMatch(thanks, /about </);
-    assert.match(thanks, /less than Opus 5\.5 at high effort/);
+    assert.match(thanks, /less of your usage limit than Opus 5\.5 at high effort/);
+    assert.match(thanks, /tokens/);
+    assert.doesNotMatch(thanks, /\$/);
     assert.match(thanks, /first tip acted on/i);
     const confetti = await page.evaluate(() =>
       !!document.getElementById("token-steward-root").shadowRoot.querySelector("canvas.ts-confetti"));

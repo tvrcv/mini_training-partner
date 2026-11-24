@@ -53,17 +53,20 @@ test("tips: light work on a heavy setup, silence otherwise", () => {
   const t = Core.evaluateTip(cfg, "Rephrase this email so it sounds more formal", "claude-opus-5-5", "high");
   assert.ok(t);
   assert.match(t.body, /pick Haiku in the model menu/);
-  assert.match(t.body, /lower cost/);
+  assert.match(t.body, /less of your usage limit/);  // default framing: limits, not dollars
+  assert.doesNotMatch(t.body, /\$/);
+  const dollars = Core.buildConfig(globalThis.TOKEN_STEWARD_SHARED, { costFraming: "dollars" });
+  assert.match(Core.evaluateTip(dollars, "Rephrase this email so it sounds more formal", "claude-opus-5-5", "high").body, /lower cost/);
   assert.strictEqual(Core.evaluateTip(cfg, "Rephrase this email so it sounds more formal", "claude-haiku-5-5", "low"), null);
   assert.strictEqual(Core.evaluateTip(cfg, "Design the system architecture for the data platform", "claude-opus-5-5", "high"), null);
   assert.strictEqual(Core.evaluateTip(cfg, "why does the auth test fail", "claude-opus-5-5", "high"), null);
   assert.strictEqual(Core.evaluateTip(cfg, "Rephrase this email", null, "high"), null); // unknown model: stay quiet
 });
 
-test("allowance framing never quotes dollars", () => {
+test("usage-limit framing never quotes dollars", () => {
   const c2 = Core.buildConfig(globalThis.TOKEN_STEWARD_SHARED, { costFraming: "allowance" });
   const t = Core.evaluateTip(c2, "Proofread this paragraph please", "claude-opus-5-5", "high");
-  assert.match(t.body, /usage allowance/);
+  assert.match(t.body, /usage limit/);
   assert.doesNotMatch(t.body, /\$/);
   const priced = Core.priceTurn(c2, { modelKey: "claude-haiku-5-5", effort: "low", promptChars: 400, historyChars: 2000, replyChars: 1200 });
   assert.doesNotMatch(Core.thanksText(c2, priced, "claude-haiku-5-5", "low", { month: 1, allTime: 2 }, true), /\$/);
