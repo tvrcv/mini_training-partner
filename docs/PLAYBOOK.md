@@ -2,7 +2,7 @@
 
 _Repository copy of the shared playbook doc, as of 24 November 2026. Keep the two in step when either changes._
 
-Use the lightest setup that does the job well: Haiku for edits and lookups, Sonnet for everyday drafting and analysis, Opus for multi-step problems, and Fable only for the hardest, highest-stakes reasoning. On a typical routine request, Sonnet at medium effort costs about 60% less than Opus at high, and Haiku about 98% less.
+Use the lightest setup that does the job well: Haiku for edits and lookups, Sonnet for everyday drafting and analysis, Opus for multi-step problems, and Fable only for the hardest, highest-stakes reasoning. On a typical routine request, Sonnet at medium effort uses roughly half as much of your usage limit as Opus at high, and Haiku about a fiftieth (estimates).
 
 ## Decide in ten seconds
 
@@ -13,25 +13,27 @@ Ask these in order and stop at the first yes:
 3. **Does it need judgement across many moving parts?** An issue tree, a model's logic, synthesis across many sources, a recommendation with real trade-offs. Use **Opus** at high effort.
 4. **Would a wrong answer be costly and hard to catch, even after Opus?** Use **Fable** at high effort, for that question only.
 
-Not sure? Start one level lower than your instinct. If the answer falls short, move up and re-ask. That costs less than defaulting to the top every time.
+Not sure? Start one level lower than your instinct. If the answer falls short, move up and re-ask. That uses far less of your limit than defaulting to the top every time.
 
-## What each choice costs
+## What each choice uses
 
-A light request costs about 65 times more on Opus at high effort than on Haiku, and about 200 times more on Fable at max. Cost of one request, at list prices:
+A light request on Opus at high effort uses roughly 65 times as much of your usage limit as the same request on Haiku, and Fable at max about 200 times. Estimated share of your limit for one request, relative to Haiku:
 
-| Request | Fable at max effort | Opus at high effort | Sonnet at medium effort | Haiku, thinking off |
-| --- | ---: | ---: | ---: | ---: |
-| Reword a client email | $0.12 | $0.04 | $0.016 | $0.0006 |
-| Summarise a one-hour interview transcript | $0.37 | $0.13 | $0.056 | $0.0024 |
-| Synthesise findings across 20 documents | $1.86 | $0.72 | $0.32 | $0.014 |
+| Request | Tokens, roughly | Fable at max effort | Opus at high effort | Sonnet at medium effort | Haiku, thinking off |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Reword a client email | 5k | 200× | 65× | 25× | 1× |
+| Summarise a one-hour interview transcript | 20k | 150× | 55× | 25× | 1× |
+| Synthesise findings across 20 documents | 130k | 130× | 50× | 20× | 1× |
 
-One request is cents. The habit is what costs money:
+One request barely moves the needle. The habit is what uses up a week's limit:
 
-- **Conversations multiply it.** Every follow-up re-sends the whole conversation, so ten exchanges in one long chat can cost five to ten times one fresh request.
+- **Conversations multiply it.** Every follow-up re-sends the whole conversation, so ten exchanges in one long chat can use five to ten times the tokens of one fresh request.
 - **Agents multiply it again.** In Claude Code or Cowork, one task can run 20 or more model calls.
-- **Headcount multiplies it once more.** As an illustration, 1,000 consultants making 20 requests a day for 220 days is 4.4 million requests a year. If 40% are light work moved from Opus to Haiku and 30% are routine work moved from Opus to Sonnet, that is about **$170,000 a year** at list prices, before counting conversations or agents.
+- **Effort multiplies it too.** Higher effort means more hidden reasoning, which is billed as output tokens.
 
-On seat-based plans the saving shows up as people hitting their usage limits later, rather than on the invoice.
+To see where you stand, run `/token-steward:setup-statusline` once in Claude Code: your session and weekly limit usage then shows under the message box, and Token Steward's tips quote it.
+
+If the firm pays per token rather than per seat, the same choices are money: as an illustration, moving 40% of 4.4 million yearly requests from Opus to Haiku and 30% to Sonnet is about $170,000 a year at list prices for 1,000 consultants.
 
 ## Use cases by workflow
 
@@ -87,7 +89,7 @@ Moving up after a lighter setup falls short is good practice, not waste. Token S
 
 | Pattern | Why it's costly | Do instead |
 | --- | --- | --- |
-| Top model as the default for everything | Pays premium rates for every request that doesn't need them | Default to Sonnet; move up per task |
+| Top model as the default for everything | Burns through the weekly limit on requests that don't need it | Default to Sonnet; move up per task |
 | One chat for the whole week | Every message re-sends days of history | New chat per topic or deliverable |
 | "Make it better" loops | Each round re-sends the draft and buys a full rewrite | Say what's wrong: "cut to 100 words, lead with the ask" |
 | Proofreading on Opus at high effort | Deep reasoning spent on commas | Haiku, thinking off |
@@ -101,12 +103,12 @@ Coach the habit, not the spend. Heavy AI users are often your most productive pe
 - **Model it.** Say out loud which setup you're using and why, especially when you move up for a hard problem.
 - **Share the playbook at kickoff.** Add a line on model choice to your engagement norms, next to file naming and review cycles.
 - **Look at the mix, not the total.** `/token-steward:savings` and the browser dashboard show which setups each person uses. A team running most light work on Haiku and Sonnet is doing it right, whatever its total.
-- **Celebrate the milestones.** Token Steward marks each person's savings milestones with a small celebration. Mention them in team meetings.
+- **Celebrate the milestones.** Token Steward celebrates each person's right-sized task milestones (10, 25, 50 and up). Mention them in team meetings.
 - **Tell us when a tip is wrong.** Wrong tips cost trust. Send examples to [contact or channel] so we can tune the rules for your practice's work.
 
 ## Assumptions behind the numbers
 
-- Prices are Anthropic's list prices per million tokens as of November 2026: Fable 5.2 $8 in / $40 out, Opus 5.5 $4 / $20, Sonnet 5.5 $2 / $10, Haiku 5.5 $0.10 / $0.50. Contracted or cloud-marketplace rates may differ.
+- Anthropic doesn't publish how fast each model uses up a limit, so relative usage is estimated from its list prices per million tokens as of November 2026: Fable 5.2 $8 in / $40 out, Opus 5.5 $4 / $20, Sonnet 5.5 $2 / $10, Haiku 5.5 $0.10 / $0.50. Contracted or cloud-marketplace rates may differ.
 - Example requests assume 4,000 tokens in and 800 out for an email, 18,000 in and 2,000 out for a transcript summary, and 120,000 in and 8,000 out for a 20-document synthesis, all at medium effort.
 - Reasoning effort is modelled as output volume relative to medium: low 0.6×, high 1.5×, max 2.8×. These are planning assumptions, not measurements.
-- The firm-wide figure is an illustration, not a forecast. Your own numbers appear in Token Steward's dashboards once it is running.
+- Token counts and limit percentages in Token Steward's messages are measured; the comparisons between setups are estimates. The firm-wide dollar figure is an illustration, not a forecast.
