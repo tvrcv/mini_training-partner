@@ -25,6 +25,9 @@ const PROMPTS = [
   "Tidy up A.PY B.PY C.PY and D.PY please, they are messy",
 ];
 
+const FIXTURE = JSON.parse(require("node:fs").readFileSync(path.join(ROOT, "tests/fixtures/prompts.json"), "utf8"));
+PROMPTS.push(...FIXTURE.light, ...FIXTURE.heavy, ...FIXTURE.neutral);
+
 test("JS classifier agrees with the Python plugin classifier", () => {
   const py = `
 import json, sys
@@ -79,7 +82,7 @@ test("extension config is in sync with the plugin's defaults.json", () => {
     path.join(ROOT, "plugins/token-steward/config/defaults.json"), "utf8"));
   const shared = globalThis.TOKEN_STEWARD_SHARED;
   const strip = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k.startsWith("_") ? undefined : v)));
-  for (const key of ["pricing", "baseline", "recommendations", "classifier", "effort_output_multiplier"]) {
+  for (const key of ["pricing", "baseline", "recommendations", "classifier", "effort_output_multiplier", "upgrade", "celebrations"]) {
     assert.deepStrictEqual(shared[key], strip(defaults[key]),
       `${key} differs: run python3 tools/build_extension_config.py`);
   }
@@ -93,4 +96,19 @@ test("unknown baselineModel in policy falls back to the default", () => {
   assert.ok(priced.savings > 0);
   const named = Core.buildConfig(globalThis.TOKEN_STEWARD_SHARED, { baselineModel: "Sonnet 5.5" });
   assert.strictEqual(named.baseline.model, "claude-sonnet-5-5");
+});
+
+test("upgrade tips: complex work on a light setup, never on a heavy one", () => {
+  const t = Core.evaluateTip(cfg, "Build an issue tree for why the client's margins fell 4 points", "claude-haiku-5-5", "low");
+  assert.strictEqual(t.kind, "upgrade");
+  assert.match(t.body, /pick Opus in the model menu/);
+  assert.strictEqual(Core.evaluateTip(cfg, "Build an issue tree for the margin decline", "claude-opus-5-5", "high"), null);
+  const off = Core.buildConfig(globalThis.TOKEN_STEWARD_SHARED, { upgradeTips: false });
+  assert.strictEqual(Core.evaluateTip(off, "Build an issue tree for the margin decline", "claude-haiku-5-5", "low"), null);
+});
+
+test("milestones", () => {
+  assert.strictEqual(Core.milestoneCrossed([1, 5, 10], 0.9, 1.2), 1);
+  assert.strictEqual(Core.milestoneCrossed([1, 5, 10], 4, 11), 10);
+  assert.strictEqual(Core.milestoneCrossed([1, 5, 10], 1.2, 4.9), null);
 });

@@ -93,3 +93,15 @@
 .ts-dialog { width: min(480px, 100%); padding: 18px 20px; }
 .ts-dialog h2 { font-size: 16px; margin: 0 0 8px; }
 .ts-dialog p { margin: 0; color: var(--ts-fg); }
+
+.ts-toast.ts-milestone { border: 2px solid var(--ts-accent); }
+.ts-toast.ts-milestone .ts-brand { font-size: 12px; }
+
+.ts-confetti {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 2147483647;
+}

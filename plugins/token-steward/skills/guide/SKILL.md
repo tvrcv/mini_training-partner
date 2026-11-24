@@ -30,6 +30,23 @@ Help the person pick the lightest setup that will do the job well. Be brief and 
 | Multi-step problems: system design, hard debugging, large refactors, synthesis across many sources, modelling with real trade-offs | Opus | high |
 | The hardest, highest-stakes reasoning, where a wrong answer is expensive | Fable | high; xhigh only if it measurably helps |
 
+**Consulting examples**
+
+| Request | Setup | Move up when |
+|---|---|---|
+| "Make this client email more formal and cut it to five lines" | Haiku | The message is sensitive: scope, fees, bad news (Sonnet) |
+| "Give me five sharper action titles for this slide" | Haiku | Titles must carry a storyline across the deck (Sonnet) |
+| "Turn these meeting notes into action items with owners" | Haiku | Notes are long and decisions need interpreting (Sonnet) |
+| "Write an XLOOKUP that pulls revenue by client ID" | Haiku | The workbook logic itself is broken (Sonnet) |
+| "Summarise this expert call into key takeaways and quotes" | Sonnet | You need patterns across ten or more calls (Opus) |
+| "Draft a steerco status update from these bullets" | Sonnet | It must argue a position the notes don't make (Opus) |
+| "Write a pandas script to clean this survey export" | Sonnet | The analysis design is open: weighting, significance (Opus) |
+| "Build an issue tree for why margins fell 4 points" | Opus | Rarely needed |
+| "Build a market sizing with three scenarios" | Opus | It goes to a client without expert review (Fable, for the review) |
+| "Red-team our board recommendation" | Opus or Fable | Use Fable for that question only |
+
+Not sure? Start one level lower than your instinct, and move up if the answer falls short.
+
 **Habits that save the most**
 
 1. **Effort is the cheapest lever.** Lower effort means less hidden reasoning. Try medium before high, and high before max.
@@ -38,4 +55,4 @@ Help the person pick the lightest setup that will do the job well. Be brief and 
 4. **Give a complete brief up front.** One clear request costs less than five rounds of clarification.
 5. **Escalate on evidence.** If a lighter setup gets it wrong, move up; that is a good use of the bigger model.
 
-In Claude Code and Cowork, Token Steward occasionally suggests a lighter setup when a request looks simple. It never blocks you and will sometimes be wrong; you're the judge. `/token-steward:savings` shows what your choices have saved, and `/token-steward:snooze` pauses tips.
+Token Steward occasionally suggests a lighter setup when a request looks simple, and a stronger one when complex work runs on a light setup. It never blocks you and will sometimes be wrong; you're the judge. Savings milestones get a small celebration. `/token-steward:savings` shows what your choices have saved, and `/token-steward:snooze` pauses tips.

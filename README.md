@@ -25,6 +25,8 @@ $12.40 this month and $48.10 in total.
 |---|---|---|
 | Session start (once a day) | A one-line reminder of the playbook: Haiku for quick edits, Sonnet for everyday work, Opus/Fable for hard problems | Sets the norm without lecturing |
 | A light request runs on a heavy setup | A short tip naming the current setup, a right-sized alternative, the estimated saving, and the exact command to switch | Feedback at the moment of decision is what changes habits |
+| Complex work runs on a light setup | A tip suggesting the stronger setup, because a right first answer costs less than several retries | Right-sizing goes both ways; it shows people the tool is on their side |
+| Savings cross a milestone ($1, $5, $10, $25 … $10,000), or someone acts on their first tip | A celebration: confetti in the browser, a celebratory message in Claude Code | Makes the habit visible and worth repeating |
 | A task finishes on a lighter setup than the reference | A thank-you with that task's saving and running totals for the session, month and all time | Positive reinforcement, and a number people can quote |
 | `/token-steward:savings` | Personal dashboard: spend, counterfactual cost, savings, model mix, tips acted on | Self-awareness without a manager in the loop |
 | `/token-steward:guide` | The right-sizing playbook (a skill, so it also works in claude.ai chat) | One page anyone can follow |
@@ -39,9 +41,10 @@ The design follows from how we'd want a guardrail to behave for our own engineer
 
 1. **Never slow anyone down.** The prompt-time check is a local heuristic (~75 ms, no network, no model call). In the default `advise` mode nothing is ever blocked, and every hook fails open: if anything goes wrong, the session carries on as if the plugin weren't there.
 2. **Inform, don't police.** Tips say what's running, what would likely suffice, and what that's worth, then defer to the person: *"Your request is running as-is."* People respond better to being trusted than to being blocked.
-3. **Stay quiet unless the evidence is clear.** A task is only called light when explicit light-work signals match (rewrite, format, translate, summarise and so on). Ambiguous or complex requests are never flagged. Cooldowns, a per-session cap and automatic back-off after three ignored tips keep it from turning into noise people learn to ignore.
-4. **Be honest about the numbers.** Every saving names the configuration it's compared with. Costs come from real token counts in the session transcript and list prices; only the effort component is modelled, and those assumptions are documented and tunable ([METHODOLOGY](docs/METHODOLOGY.md)). Nothing is claimed for tasks that ran at or above the reference.
-5. **Private by default.** Prompt and response text is never stored or sent. The local ledger holds token counts, model, effort, cost and a task class. Org telemetry is off unless an admin turns it on, and even then carries only those anonymous metrics.
+3. **Measured, not assumed.** `tests/fixtures/prompts.json` holds labelled consulting and engineering prompts. Tests require that heavy and ambiguous work is never called light, that at least 90% of light work is recognised, and that at least 85% of complex work is recognised. The extension must classify every prompt in the set exactly as the plugin does. Add your firm's own (anonymised) prompts to tighten it.
+4. **Stay quiet unless the evidence is clear.** A task is only called light when explicit light-work signals match (rewrite, format, translate, summarise and so on). Ambiguous or complex requests are never flagged. Cooldowns, a per-session cap and automatic back-off after three ignored tips keep it from turning into noise people learn to ignore.
+5. **Be honest about the numbers.** Every saving names the configuration it's compared with. Costs come from real token counts in the session transcript and list prices; only the effort component is modelled, and those assumptions are documented and tunable ([METHODOLOGY](docs/METHODOLOGY.md)). Nothing is claimed for tasks that ran at or above the reference.
+6. **Private by default.** Prompt and response text is never stored or sent. The local ledger holds token counts, model, effort, cost and a task class. Org telemetry is off unless an admin turns it on, and even then carries only those anonymous metrics.
 
 ## How it works
 
@@ -84,6 +87,7 @@ plugins/token-steward/
   scripts/steward/                     classifier, detection, pricing, transcript, ledger, reports
 docs/ADMIN.md                          rollout guide for IT / AI enablement
 docs/METHODOLOGY.md                    exactly how costs and savings are computed
+docs/PLAYBOOK.md                       use cases and examples for consultants (also kept as a shared doc)
 docs/CLAUDE-AI.md                      Cowork and claude.ai chat
 extension/                             Chrome/Edge extension: tips and savings in claude.ai chat
 tools/build_extension_config.py        copies pricing/policy/classifier into the extension

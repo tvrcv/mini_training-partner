@@ -4,6 +4,8 @@ A Chrome/Edge extension that brings Token Steward to claude.ai chat, where plugi
 
 - **While someone types** a light request on a heavy setup, a short tip appears above the message box. It names the current model and effort, suggests a lighter one with the estimated saving, and says how to switch. Sending as-is always works.
 - **When a reply finishes** on a lighter setup than the firm's reference, a thank-you appears with the estimated saving and the month and all-time totals.
+- **When complex work is typed on a light setup**, the tip suggests moving up instead.
+- **At savings milestones** (and when someone first acts on a tip), a short confetti burst and a milestone message. Confetti never blocks the page and is skipped for people who have reduced motion turned on.
 - **The toolbar popup** shows savings, replies tracked, tips acted on, the recent model mix, a pause button and CSV export.
 
 It uses the same pricing, reference configuration and classifier as the Claude Code plugin. `tools/build_extension_config.py` copies them from `plugins/token-steward/config/defaults.json` into `src/shared-config.js`.

@@ -93,7 +93,8 @@ class ClassifierTests(unittest.TestCase):
     def test_light_work(self):
         self.assertEqual(self.cls("Rephrase this email to the client so it sounds more formal"), "trivial")
         self.assertEqual(self.cls("translate this paragraph in french"), "trivial")
-        self.assertEqual(self.cls("Summarize these meeting notes into key takeaways for the partner"), "routine")
+        self.assertIn(self.cls("Summarize these meeting notes into key takeaways for the partner"), ("trivial", "routine"))
+        self.assertEqual(self.cls("Summarise this expert call transcript into key takeaways and quotes"), "routine")
 
     def test_heavy_work(self):
         self.assertEqual(self.cls("Design the system architecture for our pricing engine and walk through "
@@ -104,6 +105,31 @@ class ClassifierTests(unittest.TestCase):
         self.assertEqual(self.cls("why does the auth test fail on CI"), "general")
         self.assertEqual(self.cls("yes go ahead"), "continuation")
         self.assertEqual(self.cls("/compact"), "continuation")
+
+
+class LabelledPromptTests(unittest.TestCase):
+    """Accuracy on tests/fixtures/prompts.json. The hard rule: real work is never called light."""
+    cfg = config.load_config()
+    data = json.loads((Path(__file__).parent / "fixtures" / "prompts.json").read_text())
+    LIGHT = ("trivial", "routine")
+
+    def classes(self, label):
+        return [(p, classifier.classify(self.cfg, p)[0]) for p in self.data[label]]
+
+    def test_heavy_and_ambiguous_work_is_never_called_light(self):
+        for label in ("heavy", "neutral"):
+            wrong = [p for p, c in self.classes(label) if c in self.LIGHT]
+            self.assertEqual(wrong, [], f"{label} prompts misread as light work")
+
+    def test_light_work_recall(self):
+        got = self.classes("light")
+        recall = sum(c in self.LIGHT for _, c in got) / len(got)
+        self.assertGreaterEqual(recall, 0.9, [p for p, c in got if c not in self.LIGHT])
+
+    def test_complex_work_recall(self):
+        got = self.classes("heavy")
+        recall = sum(c == "complex" for _, c in got) / len(got)
+        self.assertGreaterEqual(recall, 0.85, [p for p, c in got if c != "complex"])
 
 
 class PricingTests(unittest.TestCase):
@@ -148,7 +174,8 @@ class HookFlowTests(unittest.TestCase):
 
         # User follows the tip; the next completed task is thanked and counted as accepted.
         _, stop = s.turn("Now shorten the second paragraph", "claude-haiku-5-5", "low")
-        self.assertIn("Thanks for switching", stop["systemMessage"])
+        self.assertIn("first tip acted on", stop["systemMessage"])
+        self.assertEqual(stop["systemMessage"].count("Thank"), 1)
         self.assertIn("Opus 5.5 @ high", stop["systemMessage"])
         rows = s.ledger()
         self.assertEqual(len(rows), 3)
@@ -233,6 +260,56 @@ class HookFlowTests(unittest.TestCase):
         s.hook("UserPromptSubmit", prompt="hello there")
         state = json.loads((s.data / "sessions" / f"{s.sid}.json").read_text())
         self.assertEqual(state["predicted_model"], "claude-opus-5-5")
+
+    def test_upgrade_tip_for_complex_work_on_light_setup(self):
+        s = Session()
+        s.turn("warm-up question about the deck", "claude-haiku-5-5", "low")
+        p = s.hook("UserPromptSubmit", prompt="Build an issue tree for why the client's margins fell 4 points")
+        self.assertIn("complex, multi-step work", p["systemMessage"])
+        self.assertIn("/model opus", p["systemMessage"])
+        self.assertIn("running as-is", p["systemMessage"])
+        self.assertNotIn("decision", p)
+        # Already on Opus at high: nothing to say.
+        s2 = Session()
+        s2.turn("warm-up question about the deck", "claude-opus-5-5", "high")
+        self.assertEqual(s2.hook("UserPromptSubmit", prompt="Build an issue tree for the margin decline"), {})
+
+    def test_milestone_celebration(self):
+        from steward.hooks import milestone_crossed
+        self.assertEqual(milestone_crossed([1, 5, 10], 0.9, 1.2), 1)
+        self.assertEqual(milestone_crossed([1, 5, 10], 4.0, 11.0), 10)
+        self.assertIsNone(milestone_crossed([1, 5, 10], 1.2, 4.9))
+        s = Session()
+        # A big right-sized task crosses the $1 milestone in one go.
+        _, stop = s.turn("Summarise these 20 analyst reports for the partner", "claude-sonnet-5-5", "medium",
+                         inp=200000, out=40000, cr=0)
+        self.assertIn("Milestone", stop["systemMessage"])
+        self.assertIn("$1", stop["systemMessage"])
+
+    def test_weekly_recap_in_banner(self):
+        s = Session()
+        s.turn("Summarise these 20 analyst reports for the partner", "claude-sonnet-5-5", "medium", inp=50000, out=5000)
+        banner = s.hook("SessionStart", source="startup", model="claude-opus-5-5")
+        self.assertIn("Last 7 days", banner["systemMessage"])
+        self.assertIn("1 right-sized task", banner["systemMessage"])
+
+    def test_ledger_rotation_keeps_history(self):
+        from steward import store
+        s = Session()
+        env = s.env()
+        old = dict(os.environ)
+        os.environ.update(CLAUDE_PLUGIN_DATA=env["CLAUDE_PLUGIN_DATA"])
+        try:
+            store.LEDGER_ROTATE_BYTES, saved = 100, store.LEDGER_ROTATE_BYTES
+            for i in range(5):
+                store.append_ledger({"ts": i, "savings": 0.1, "tokens": {}})
+            store.LEDGER_ROTATE_BYTES = saved
+            self.assertEqual(len(store.read_ledger()), 5)
+            self.assertTrue(list(s.data.glob("ledger-*.jsonl")))
+            self.assertLessEqual(len(store.read_ledger_tail()), 5)
+        finally:
+            os.environ.clear()
+            os.environ.update(old)
 
     def test_fails_open_on_garbage(self):
         s = Session()

@@ -42,7 +42,9 @@ Every key in `config/defaults.json` can be overridden. Point `TOKEN_STEWARD_CONF
 | How assertive tips are | `nudge.mode` | `advise` | `confirm` holds a prompt once, only for severe mismatches (severity ≥ `confirm_min_severity`, e.g. a trivial edit at max effort on the top model). Pressing Enter again on the same prompt sends it unchanged |
 | How often tips appear | `nudge.min_prompts_between_nudges`, `min_minutes_between_nudges`, `max_nudges_per_session`, `stop_after_consecutive_ignored` | 3 / 10 / 4 / 3 | Err toward fewer. A tip people learn to ignore teaches nothing |
 | Ask the model to be brief on trivial tasks | `nudge.concise_hint_for_trivial` | off | Adds one sentence to Claude's context. Saves output tokens but changes behaviour silently, so it's off unless you choose it |
-| Firm vocabulary | `classifier.signals` | Consulting + engineering terms | Add your own deliverable names (e.g. "steerco deck", "IC memo") with the weight you want |
+| Upgrade tips | `upgrade.enabled`, `upgrade.target`, `upgrade.max_per_session` | on, Opus @ high, 2 per session | Suggest moving up when complex work runs on a light setup |
+| Celebrations | `celebrations.enabled`, `celebrations.milestones_usd` | on, $1 … $10,000 | Seat-plan firms on the extension's `allowance` framing celebrate `milestones_right_sized_tasks` instead |
+| Firm vocabulary | `classifier.signals` | Consulting + engineering terms | Add your own deliverable names (e.g. "steerco deck", "IC memo") with the weight you want. After any change, add examples to `tests/fixtures/prompts.json` and run the tests: they fail if real work starts being called light |
 
 **Not recommended:** making `confirm` the default for everyone, or shortening the cooldowns. Our working assumption is that a guardrail that slows people down loses their trust and gets uninstalled.
 

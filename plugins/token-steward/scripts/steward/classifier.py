@@ -45,7 +45,9 @@ def classify(cfg, prompt):
 
     # Slash commands and very short continuations ("yes", "go ahead") carry no signal about the
     # task itself; they continue whatever was already under way.
-    if text.startswith("/") or words <= 3:
+    # Slash commands, and very short replies with no task words ("yes", "go ahead", "do it"),
+    # continue whatever was already under way.
+    if text.startswith("/") or (words <= 3 and not matched):
         return "continuation", score, matched
 
     has_light_signal = any(

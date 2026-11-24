@@ -37,7 +37,7 @@ def _severity(cfg, model_key, effort, rec):
 
 def _typical_usage(cfg, task_class):
     """This user's median-ish turn size for the class (last 50 turns), else configured defaults."""
-    rows = [r for r in store.read_ledger()[-400:] if r.get("task_class") == task_class][-50:]
+    rows = [r for r in store.read_ledger_tail() if r.get("task_class") == task_class][-50:]
     if len(rows) >= 5:
         usage = {}
         for k in pricing.USAGE_KEYS:
@@ -120,6 +120,38 @@ def _post_telemetry(cfg, record):
         pass  # telemetry must never affect the session
 
 
+def _upgrade_gap(cfg, model_key, effort):
+    """How far below the 'complex work' setup the session is (same scale as nudge severity)."""
+    target = cfg["upgrade"]["target"]
+    model_gap = max(0, target["tier"] - pricing.tier_of(cfg, model_key))
+    cur = pricing.effort_rank(cfg, effort)
+    effort_gap = max(0, pricing.effort_rank(cfg, target["effort"]) - cur) if cur is not None else 0
+    return 2 * model_gap + effort_gap, model_gap, effort_gap
+
+
+def _build_upgrade(cfg, matched, model_key, effort, model_gap, effort_gap):
+    target = cfg["upgrade"]["target"]
+    heavy = [m for m in matched if any(s["name"] == m and s["weight"] > 0 for s in cfg["classifier"]["signals"])]
+    what = "complex, multi-step work" + (f" ({', '.join(heavy[:2])})" if heavy else "")
+    rec_model = pricing.model_for_tier(cfg, target["tier"]) if model_gap else model_key
+    current = pricing.label_of(cfg, model_key) + (f" at {effort} effort" if effort else "")
+    better = pricing.label_of(cfg, rec_model) + (f" at {target['effort']} effort" if effort_gap else "")
+    steps = []
+    if model_gap:
+        steps.append(cfg["tier_commands"][str(target["tier"])])
+    if effort_gap:
+        steps.append(f"/effort {target['effort']}")
+    return (f"{PREFIX}This looks like {what}. You're on {current}. For work like this, {better} usually "
+            f"gets it right first time, which costs less than several retries. To switch: "
+            f"{' then '.join(steps)}. Your request is running as-is.")
+
+
+def milestone_crossed(milestones, before, after):
+    """The highest milestone passed when a running total moved from `before` to `after`, else None."""
+    crossed = [m for m in milestones if before < m <= after]
+    return max(crossed) if crossed else None
+
+
 # ---- SessionStart ----------------------------------------------------------------------------
 
 def on_session_start(cfg, inp):
@@ -144,15 +176,18 @@ def on_session_start(cfg, inp):
     prefs["last_banner_day"] = today
     store.save_prefs(prefs)
 
-    totals = store.load_totals()
-    month_saved = totals["by_month"].get(store.month_key(), {}).get("savings", 0.0)
+    week_ago = time.time() - 7 * 86400
+    week = [r for r in store.read_ledger_tail() if r.get("ts", 0) >= week_ago]
+    week_saved = sum(max(r.get("savings", 0.0), 0.0) for r in week)
     model_key = pricing.resolve_model(cfg, inp.get("model"))
     msg = (f"{PREFIX}Match the model to the task: Haiku for quick edits and lookups, Sonnet for "
            f"everyday drafting and coding, Opus or Fable for genuinely hard problems.")
     if model_key:
         msg += f" This session starts on {pricing.label_of(cfg, model_key)}."
-    if month_saved >= 0.01:
-        msg += f" You've saved {pricing.fmt_money(cfg, month_saved)} this month."
+    if week_saved >= 0.01:
+        light = sum(1 for r in week if r.get("savings", 0) > 0)
+        msg += (f" Last 7 days: {pricing.fmt_money(cfg, week_saved)} saved across {light} right-sized "
+                f"task{'s' if light != 1 else ''}.")
     msg += " Playbook: /token-steward:guide"
     return {"systemMessage": msg}
 
@@ -211,6 +246,16 @@ def on_user_prompt_submit(cfg, inp):
                 "additionalContext": "This request looks simple. Answer directly and concisely; "
                                      "avoid extended exploration unless it is actually needed.",
             })
+
+    up = cfg.get("upgrade") or {}
+    if task_class == "complex" and model_key and up.get("enabled", True) and not out \
+            and state.get("upgrades_shown", 0) < up.get("max_per_session", 2) and _nudge_allowed(cfg, state):
+        gap, model_gap, effort_gap = _upgrade_gap(cfg, model_key, effort)
+        if gap >= up.get("min_gap", 2):
+            out = {"systemMessage": _build_upgrade(cfg, matched, model_key, effort, model_gap, effort_gap)}
+            state["upgrades_shown"] = state.get("upgrades_shown", 0) + 1
+            state["last_nudge_prompt"] = state["prompt_count"]
+            state["last_nudge_ts"] = time.time()
 
     store.save_session(sid, state)
     return out
@@ -295,15 +340,26 @@ def on_stop(cfg, inp):
     _post_telemetry(cfg, record)
 
     out = {}
+    money = lambda x: pricing.fmt_money(cfg, x)  # noqa: E731
+    cel = cfg.get("celebrations") or {}
+    celebration = ""
+    if cel.get("enabled", True) and savings > 0:
+        after = totals["all_time"]["savings"]
+        reached = milestone_crossed(cel.get("milestones_usd", []), after - savings, after)
+        if reached:
+            celebration = (f"\U0001F389 Milestone: you've now saved the firm {money(reached)} by right-sizing "
+                           f"your AI use. Thank you, this is exactly the habit that adds up. ")
+        elif accepted and totals.get("nudges_accepted") == 1:
+            celebration = "\U0001F389 Your first tip acted on. Thank you! "
+
     th = cfg.get("thanks") or {}
     cooled = now - state.get("last_thanks_ts", 0) >= th.get("min_minutes_between_messages", 15) * 60
     if th.get("enabled", True) and not store.is_snoozed() and savings >= th.get("min_turn_savings_usd", 0.01) \
-            and (accepted or cooled):
-        money = lambda x: pricing.fmt_money(cfg, x)  # noqa: E731
+            and (accepted or cooled or celebration):
         month = totals["by_month"].get(store.month_key(now), {}).get("savings", 0.0)
-        opener = "Thanks for switching, and for considering your usage." if accepted \
-            else "Thank you for considering your usage."
-        msg = (f"{PREFIX}{opener} This task ran on {pricing.label_of(cfg, primary)}"
+        opener = "" if celebration else "Thanks for switching, and for considering your usage. " if accepted \
+            else "Thank you for considering your usage. "
+        msg = (f"{PREFIX}{celebration}{opener}This task ran on {pricing.label_of(cfg, primary)}"
                f"{f' @ {effort}' if effort else ''} for {money(cost)}, about {money(savings)} less than "
                f"{pricing.label_of(cfg, base_key)} @ {base['effort']}. You've saved the business "
                f"{money(state['session_savings'])} this session, {money(month)} this month and "

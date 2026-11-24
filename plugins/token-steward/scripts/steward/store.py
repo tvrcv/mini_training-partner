@@ -150,20 +150,54 @@ def _add_to_totals(record):
     return totals
 
 
+LEDGER_ROTATE_BYTES = 8 * 1024 * 1024  # ~20,000 tasks; older rows move to a dated archive file
+
+
 def append_ledger(record):
-    with open(data_dir() / "ledger.jsonl", "a", encoding="utf-8") as fh:
+    path = data_dir() / "ledger.jsonl"
+    try:
+        if path.stat().st_size > LEDGER_ROTATE_BYTES:
+            os.replace(path, data_dir() / f"ledger-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 10**9:09d}.jsonl")
+    except OSError:
+        pass
+    with open(path, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, separators=(",", ":")) + "\n")
 
 
-def read_ledger():
+def read_ledger_tail(max_bytes=512 * 1024):
+    """Recent rows only, read from the end of the file: keeps the prompt-time path fast."""
     path = data_dir() / "ledger.jsonl"
-    if not path.exists():
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            fh.seek(max(0, size - max_bytes))
+            chunk = fh.read()
+    except OSError:
         return []
+    lines = chunk.splitlines()
+    if size > max_bytes:
+        lines = lines[1:]  # first line may be cut mid-row
     out = []
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            try:
-                out.append(json.loads(line))
-            except ValueError:
-                continue
+    for line in lines:
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
+
+
+def read_ledger():
+    """Every row, archives included, oldest first (for reports and export)."""
+    files = sorted(data_dir().glob("ledger-*.jsonl")) + [data_dir() / "ledger.jsonl"]
+    out = []
+    for path in files:
+        if not path.exists():
+            continue
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    out.append(json.loads(line))
+                except ValueError:
+                    continue
     return out

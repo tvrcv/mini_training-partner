@@ -24,6 +24,8 @@
     charsPerToken: 4,
     thinkingOffEffort: "low",     // what "extended thinking off" counts as
     thinkingOnEffort: "high",     // what "extended thinking on" counts as when no explicit level is shown
+    upgradeTips: true,            // also suggest moving UP when complex work runs on a light setup
+    celebrations: true,           // confetti and a milestone message when savings milestones are reached
     selectors: {}                 // optional DOM selector overrides, see dom.js
   };
 
@@ -77,7 +79,7 @@
     const files = new Set((text.match(FILE_REF) || [])).size;
     if (fences >= 2 || files >= 4) { score += 2; matched.push("multiple files / code blocks"); }
 
-    if (text.startsWith("/") || words <= 3) return { taskClass: "continuation", score, matched };
+    if (text.startsWith("/") || (words <= 3 && !matched.length)) return { taskClass: "continuation", score, matched };
 
     let taskClass = "general";
     if (score >= c.complex_min_score) taskClass = "complex";
@@ -158,6 +160,7 @@
   function evaluateTip(cfg, prompt, modelKey, effort) {
     if (!modelKey) return null;
     const { taskClass, matched } = classify(cfg, prompt);
+    if (taskClass === "complex") return evaluateUpgrade(cfg, matched, modelKey, effort);
     const rec = cfg.recommendations[taskClass];
     if (!rec) return null;
     const sev = severity(cfg, modelKey, effort, rec);
@@ -183,6 +186,7 @@
     if (sev.effortGap) steps.push(recEffort === "low" ? "turn extended thinking off" : "set effort to " + recEffort);
 
     return {
+      kind: "downsize",
       severity: sev.severity,
       taskClass,
       recModel,
@@ -193,6 +197,41 @@
       body: "You're on " + current + ", which is built for complex, multi-step work. " + target +
             " typically handles this just as well" + saving + ". To switch: " + steps.join(", then ") + "."
     };
+  }
+
+  // Right-sizing goes both ways: complex work on a light setup gets a suggestion to move up.
+  function evaluateUpgrade(cfg, matched, modelKey, effort) {
+    const up = cfg.upgrade || {};
+    if (!up.enabled || !cfg.policy.upgradeTips) return null;
+    const t = up.target;
+    const modelGap = Math.max(0, t.tier - tierOf(cfg, modelKey));
+    const cur = effortRank(cfg, effort);
+    const effortGap = cur === null ? 0 : Math.max(0, effortRank(cfg, t.effort) - cur);
+    if (2 * modelGap + effortGap < (up.min_gap || 2)) return null;
+    const heavy = matched.filter((m) => cfg.classifier.signals.some((s) => s.name === m && s.weight > 0));
+    const recModel = modelGap ? modelForTier(cfg, t.tier) : modelKey;
+    const steps = [];
+    if (modelGap) steps.push("pick " + cfg.tier_names[String(t.tier)] + " in the model menu");
+    if (effortGap) steps.push("turn extended thinking on or set effort to " + t.effort);
+    return {
+      kind: "upgrade",
+      severity: 2 * modelGap + effortGap,
+      taskClass: "complex",
+      recModel,
+      recEffort: t.effort,
+      fromTier: tierOf(cfg, modelKey),
+      fromEffortRank: cur,
+      title: "This looks like complex, multi-step work" + (heavy.length ? " (" + heavy.slice(0, 2).join(", ") + ")" : "") + ".",
+      body: "You're on " + labelOf(cfg, modelKey) + (effort ? " at " + effort + " effort" : "") + ". For work like this, " +
+            labelOf(cfg, recModel) + " usually gets it right first time, which costs less than several retries. To switch: " +
+            steps.join(", then ") + "."
+    };
+  }
+
+  // The highest milestone passed when a running total moved from `before` to `after`, else null.
+  function milestoneCrossed(milestones, before, after) {
+    const crossed = (milestones || []).filter((m) => before < m && m <= after);
+    return crossed.length ? Math.max(...crossed) : null;
   }
 
   function estimateRatio(cfg, fromKey, fromEffort, toKey, toEffort) {
@@ -211,22 +250,22 @@
     return { usage, cost: actual, baselineCost: reference, savings: reference - actual, baseKey };
   }
 
-  function thanksText(cfg, priced, modelKey, effort, totals, accepted) {
-    const opener = accepted ? "Thanks for switching, and for considering your usage." : "Thank you for considering your usage.";
+  function thanksText(cfg, priced, modelKey, effort, totals, accepted, celebrating) {
+    const opener = celebrating ? "" : accepted ? "Thanks for switching, and for considering your usage." : "Thank you for considering your usage.";
     const base = labelOf(cfg, priced.baseKey) + " at " + cfg.baseline.effort + " effort";
     if (cfg.policy.costFraming === "allowance") {
       const ratio = priced.cost > 0 ? priced.baselineCost / priced.cost : 1;
-      return opener + " That reply on " + labelOf(cfg, modelKey) + " used roughly " + Math.max(1, Math.round(ratio)) +
+      return (opener ? opener + " " : "") + "That reply on " + labelOf(cfg, modelKey) + " used roughly " + Math.max(1, Math.round(ratio)) +
         "× less of your usage allowance than " + base + " would have (estimate).";
     }
-    return opener + " That reply on " + labelOf(cfg, modelKey) + " cost " + (priced.cost < 0.01 ? "under " + (cfg.currency_symbol || "$") + "0.01" : "about " + fmtMoney(cfg, priced.cost)) +
+    return (opener ? opener + " " : "") + "That reply on " + labelOf(cfg, modelKey) + " cost " + (priced.cost < 0.01 ? "under " + (cfg.currency_symbol || "$") + "0.01" : "about " + fmtMoney(cfg, priced.cost)) +
       ", roughly " + fmtMoney(cfg, priced.savings) + " less than " + base + ". You've saved the business ≈" +
       fmtMoney(cfg, totals.month) + " this month and ≈" + fmtMoney(cfg, totals.allTime) + " in total (estimates at API list prices).";
   }
 
   root.TokenStewardCore = {
     POLICY_DEFAULTS, buildConfig, classify, modelFromLabel, tierOf, labelOf, effortRank, cost,
-    counterfactualCost, estimateChatUsage, severity, evaluateTip, priceTurn, thanksText, fmtMoney
+    counterfactualCost, estimateChatUsage, severity, evaluateTip, priceTurn, thanksText, fmtMoney, milestoneCrossed
   };
   if (typeof module !== "undefined") module.exports = root.TokenStewardCore;
 })(typeof globalThis !== "undefined" ? globalThis : this);

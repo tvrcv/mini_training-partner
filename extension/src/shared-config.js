@@ -195,7 +195,7 @@ globalThis.TOKEN_STEWARD_SHARED = {
    {
     "name": "simple lookup",
     "weight": -2,
-    "pattern": "^(what('s| is| are)|who is|when (is|was)|define|how do i|how to|what does)\\b"
+    "pattern": "^(what('s| is)|who is|when (is|was)|define|how do i|how to|what does)\\b"
    },
    {
     "name": "small code chore",
@@ -205,12 +205,17 @@ globalThis.TOKEN_STEWARD_SHARED = {
    {
     "name": "slide / doc touch-up",
     "weight": -2,
-    "pattern": "\\b(slide title|headline|action title|speaker notes|exec(utive)? summary bullet|one[- ]liner)\\b"
+    "pattern": "\\b(slide titles?|headlines?|action titles?|speaker notes|exec(utive)? summary bullets?|one[- ]liner|page titles?|tracker update)\\b"
+   },
+   {
+    "name": "meeting admin",
+    "weight": -2,
+    "pattern": "\\b(action items|meeting notes|minutes|agenda|calendar invite|out[- ]of[- ]office)\\b"
    },
    {
     "name": "architecture / design",
     "weight": 3,
-    "pattern": "\\b(architect(ure)?|system design|design (a|the) (system|service|pipeline|data model)|scalab(le|ility))\\b"
+    "pattern": "\\b(architect(ure)?|system design|design (a|the|our)( [a-z-]+)? (system|service|pipeline|data model|platform|architecture)|scalab(le|ility))\\b"
    },
    {
     "name": "hard debugging",
@@ -230,7 +235,22 @@ globalThis.TOKEN_STEWARD_SHARED = {
    {
     "name": "strategic analysis",
     "weight": 3,
-    "pattern": "\\b(due diligence|market sizing|tam|business case|valuation|dcf|scenario (analysis|model)|trade-?offs?|competitive (landscape|analysis)|synthesi[sz]e (the|these|across))\\b"
+    "pattern": "\\b(due diligence|market sizing|tam|business case|valuation|dcf|scenario (analysis|model)|trade-?offs?|competitive (landscape|analysis)|synthesi[sz]e (the|these|across)|cost transformation|operating model|org(anisation|anization)? design|go[- ]to[- ]market|post[- ]merger|synerg(y|ies)|investment thesis|m&a)\\b"
+   },
+   {
+    "name": "problem structuring",
+    "weight": 3,
+    "pattern": "\\b(issue tree|hypothes[ie]s|workplan|mece|driver tree|value driver|logic tree)\\b"
+   },
+   {
+    "name": "critical review",
+    "weight": 3,
+    "pattern": "\\b(red[- ]team|weakest assumptions?|stress[- ]test|pressure[- ]test|poke holes|challenge (our|the|this) (recommendation|thesis|logic))\\b"
+   },
+   {
+    "name": "judgement call",
+    "weight": 2,
+    "pattern": "\\b(risks?|recommend(ation|s)?|should (we|i)|what do you think|prioriti[sz]e|point of view|implications?)\\b"
    },
    {
     "name": "multi-step planning",
@@ -244,9 +264,47 @@ globalThis.TOKEN_STEWARD_SHARED = {
    },
    {
     "name": "data / modelling",
-    "weight": 2,
-    "pattern": "\\b(statistical|regression|forecast(ing)?|optimi[sz]ation model|monte carlo|sensitivity analysis)\\b"
+    "weight": 3,
+    "pattern": "\\b(statistical|regression|forecast(ing)? model|optimi[sz]ation model|monte carlo|sensitivity analysis|segmentation|segment the|conjoint|cohort analysis)\\b"
    }
+  ]
+ },
+ "upgrade": {
+  "enabled": true,
+  "target": {
+   "tier": 3,
+   "effort": "high"
+  },
+  "min_gap": 2,
+  "max_per_session": 2
+ },
+ "celebrations": {
+  "enabled": true,
+  "milestones_usd": [
+   1,
+   5,
+   10,
+   25,
+   50,
+   100,
+   250,
+   500,
+   1000,
+   2500,
+   5000,
+   10000
+  ],
+  "milestones_right_sized_tasks": [
+   10,
+   25,
+   50,
+   100,
+   250,
+   500,
+   1000,
+   2500,
+   5000,
+   10000
   ]
  }
 };

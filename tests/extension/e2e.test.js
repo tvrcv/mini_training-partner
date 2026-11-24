@@ -99,6 +99,10 @@ test("tip while typing, no block on send, thanks after switching", { timeout: 60
     assert.match(thanks, /Thank/);
     assert.doesNotMatch(thanks, /about </);
     assert.match(thanks, /less than Opus 5\.5 at high effort/);
+    assert.match(thanks, /first tip acted on/i);
+    const confetti = await page.evaluate(() =>
+      !!document.getElementById("token-steward-root").shadowRoot.querySelector("canvas.ts-confetti"));
+    assert.ok(confetti, "a small confetti burst marks the first tip acted on");
     await shot(page, "ts-thanks.png");
 
     // Savings were recorded, and nothing typed was stored.
@@ -145,6 +149,27 @@ test("two claude.ai tabs both count towards the same totals", { timeout: 60000 }
     assert.strictEqual(local.totals.allTime.turns, 3);
     assert.strictEqual(local.ledger.length, 3);
     assert.strictEqual(local.state.messageCount, 3);
+  } finally {
+    await ctx.close();
+    try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (e) { /* best effort */ }
+  }
+});
+
+test("complex work on a light setup gets an upgrade tip", { timeout: 60000 }, async () => {
+  const { ctx, page, profile } = await launch();
+  try {
+    await waitFor(() => page.evaluate(() => !!document.getElementById("token-steward-root")));
+    await page.evaluate(() => {
+      document.getElementById("model").textContent = "Haiku 5.5";
+      document.getElementById("thinking").setAttribute("aria-pressed", "false");
+    });
+    await type(page, "Build an issue tree for why the client's margins fell 4 points");
+    const tip = await waitFor(() => shadowText(page, "ts-tip"));
+    assert.ok(tip, "upgrade tip should appear");
+    assert.match(tip, /complex, multi-step work/);
+    assert.match(tip, /pick Opus in the model menu/);
+    await page.keyboard.press("Enter");
+    assert.strictEqual((await page.evaluate(() => window.sent)).length, 1, "never blocks");
   } finally {
     await ctx.close();
     try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (e) { /* best effort */ }

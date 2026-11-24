@@ -117,8 +117,12 @@
         s.lastTipTs = Date.now();
         if (s.tipsDay !== today()) { s.tipsDay = today(); s.tipsToday = 0; }
         s.tipsToday += 1;
-        s.pending = { message: s.messageCount + 1, fromTier: tip.fromTier, fromEffortRank: tip.fromEffortRank };
-        st.totals.tipsShown += 1;
+        if (tip.kind === "upgrade") {
+          st.totals.upgradeTipsShown = (st.totals.upgradeTipsShown || 0) + 1;
+        } else {
+          s.pending = { message: s.messageCount + 1, fromTier: tip.fromTier, fromEffortRank: tip.fromEffortRank };
+          st.totals.tipsShown += 1;
+        }
       });
     }
   }
@@ -150,7 +154,7 @@
     if (p.enabled && p.mode === "confirm" && !snoozed()) {
       const { modelKey, effort } = currentSetup();
       const tip = draft.tip || Core.evaluateTip(cfg, text, modelKey, effort);
-      if (tip && tip.severity >= p.confirmMinSeverity && !draft.confirmed) {
+      if (tip && tip.kind !== "upgrade" && tip.severity >= p.confirmMinSeverity && !draft.confirmed) {
         ev.preventDefault();
         ev.stopImmediatePropagation();
         ui.hideTip();
@@ -244,18 +248,41 @@
       st.ledger.push(row);
       if (st.ledger.length > LEDGER_MAX) st.ledger.splice(0, st.ledger.length - LEDGER_MAX);
       const tot = st.totals;
+      const before = { savings: tot.allTime.savings, rightSized: tot.allTime.rightSized || 0 };
       const m = tot.byMonth[monthKey(now)] = tot.byMonth[monthKey(now)] || { cost: 0, baseline: 0, savings: 0, turns: 0 };
       for (const b of [tot.allTime, m]) {
         b.cost += row.cost; b.baseline += row.baseline_cost; b.savings += Math.max(0, row.savings); b.turns += 1;
       }
+      if (row.savings > 0) tot.allTime.rightSized = before.rightSized + 1;
+
       const p = cfg.policy, s = st.state;
+      if (!p.enabled || snoozed()) return;
+      const milestone = celebrationFor(before, tot, t.accepted);
       const cooled = now - (s.lastThanksTs || 0) >= p.thanksMinMinutesBetween * 60000;
-      if (p.enabled && !snoozed() && row.savings >= p.thanksMinSavingsUsd && (t.accepted || cooled)) {
-        ui.toast(Core.thanksText(cfg, priced, t.modelKey, t.effort,
-                                 { month: m.savings, allTime: tot.allTime.savings }, t.accepted));
+      if (milestone || (row.savings >= p.thanksMinSavingsUsd && (t.accepted || cooled))) {
+        const thanks = row.savings > 0 ? Core.thanksText(cfg, priced, t.modelKey, t.effort,
+          { month: m.savings, allTime: tot.allTime.savings }, t.accepted, !!milestone) : "";
+        ui.toast(milestone ? milestone.text + " " + thanks : thanks, { milestone: !!milestone, big: milestone && milestone.big });
+        if (milestone && p.celebrations) ui.confetti(milestone.big);
         s.lastThanksTs = now;
       }
     });
+  }
+
+  // A savings milestone (or a first tip acted on) earns a celebration. Seat-plan firms using the
+  // "allowance" framing count right-sized replies instead of dollars.
+  function celebrationFor(before, tot, accepted) {
+    const c = cfg.celebrations || {};
+    if (!c.enabled || !cfg.policy.celebrations) return null;
+    if (cfg.policy.costFraming === "allowance") {
+      const n = Core.milestoneCrossed(c.milestones_right_sized_tasks, before.rightSized, tot.allTime.rightSized || 0);
+      if (n) return { big: true, text: "Milestone: " + n + " right-sized replies. Thank you, this is exactly the habit that adds up." };
+    } else {
+      const usd = Core.milestoneCrossed(c.milestones_usd, before.savings, tot.allTime.savings);
+      if (usd) return { big: true, text: "Milestone: you've now saved the firm ≈" + Core.fmtMoney(cfg, usd) + " by right-sizing your AI use. Thank you, this is exactly the habit that adds up." };
+    }
+    if (accepted && tot.tipsAccepted === 1) return { big: false, text: "Your first tip acted on. Thank you!" };
+    return null;
   }
 
   // ---- UI (shadow DOM so claude.ai styles and ours never collide) ---------------------------
@@ -317,15 +344,57 @@
         place();
       },
       hideTip() { tip.hidden = true; },
-      toast(message) {
+      toast(message, opts) {
+        const milestone = !!(opts && opts.milestone);
+        toastEl.classList.toggle("ts-milestone", milestone);
         toastEl.replaceChildren(el("div", "ts-brand"), el("div", "ts-text"),
           button("×", "ts-close", () => { toastEl.hidden = true; }));
-        toastEl.querySelector(".ts-brand").textContent = "Token Steward";
+        toastEl.querySelector(".ts-brand").textContent =
+          milestone && opts.big ? "Token Steward · Milestone" : milestone ? "Token Steward · Thank you" : "Token Steward";
         toastEl.querySelector(".ts-text").textContent = message;
         toastEl.querySelector(".ts-close").setAttribute("aria-label", "Dismiss");
         toastEl.hidden = false;
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => { toastEl.hidden = true; }, 12000);
+      },
+      // Confetti on a canvas over the page; pointer-events off so nothing under it is blocked.
+      // Skipped entirely for people who ask their system for reduced motion.
+      confetti(big) {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const canvas = el("canvas", "ts-confetti", { "aria-hidden": "true" });
+        shadow.append(canvas);
+        const dpr = window.devicePixelRatio || 1;
+        const W = window.innerWidth, H = window.innerHeight;
+        canvas.width = W * dpr; canvas.height = H * dpr;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { canvas.remove(); return; }
+        ctx.scale(dpr, dpr);
+        const colors = ["#2f5d50", "#7fb8a4", "#e0a458", "#d9534f", "#5b8def", "#f2d06b", "#b07cc6"];
+        const count = big ? 160 : 50;
+        const parts = Array.from({ length: count }, (_, i) => {
+          const fromLeft = i % 2 === 0;
+          return {
+            x: fromLeft ? W * 0.15 : W * 0.85, y: H * 0.75,
+            vx: (fromLeft ? 1 : -1) * (3 + Math.random() * 6), vy: -(9 + Math.random() * 8),
+            w: 6 + Math.random() * 6, h: 3 + Math.random() * 4,
+            r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+            c: colors[i % colors.length]
+          };
+        });
+        const start = performance.now(), duration = big ? 2600 : 1600;
+        function frame(now) {
+          const t = now - start;
+          ctx.clearRect(0, 0, W, H);
+          ctx.globalAlpha = Math.max(0, 1 - Math.max(0, t - duration * 0.6) / (duration * 0.4));
+          for (const p of parts) {
+            p.vy += 0.35; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+            ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+            ctx.restore();
+          }
+          if (t < duration) requestAnimationFrame(frame); else canvas.remove();
+        }
+        requestAnimationFrame(frame);
       },
       confirm(t, onSendAnyway) {
         const backdrop = el("div", "ts-backdrop");

@@ -14,7 +14,8 @@ SRC = ROOT / "plugins" / "token-steward" / "config" / "defaults.json"
 OUT = ROOT / "extension" / "src" / "shared-config.js"
 
 KEYS = ["currency_symbol", "pricing", "aliases", "tier_names", "effort_levels",
-        "effort_output_multiplier", "baseline", "recommendations", "classifier"]
+        "effort_output_multiplier", "baseline", "recommendations", "classifier", "upgrade",
+        "celebrations"]
 
 
 def strip_comments(obj):

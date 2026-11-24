@@ -69,6 +69,21 @@
     "concise_hint_for_trivial": false
   },
 
+  "upgrade": {
+    "_comment": "Right-sizing goes both ways: when a request looks like complex, multi-step work on a light setup, suggest moving up. A first answer that is right costs less than several retries, and it shows people the tool is on their side.",
+    "enabled": true,
+    "target": {"tier": 3, "effort": "high"},
+    "min_gap": 2,
+    "max_per_session": 2
+  },
+
+  "celebrations": {
+    "_comment": "A small celebration when someone's all-time savings cross a milestone (USD), and when they first act on a tip. The browser extension shows confetti; Claude Code shows a celebratory message. Seat-plan firms using the extension's 'allowance' framing celebrate right-sized task counts instead.",
+    "enabled": true,
+    "milestones_usd": [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+    "milestones_right_sized_tasks": [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+  },
+
   "thanks": {
     "enabled": true,
     "min_turn_savings_usd": 0.01,
@@ -109,18 +124,22 @@
       {"name": "translation",             "weight": -3, "pattern": "\\b(translate|translation|in (french|german|spanish|portuguese|italian|japanese|chinese|english))\\b"},
       {"name": "summarise",               "weight": -2, "pattern": "\\b(summari[sz]e|summary|tl;?dr|key (points|takeaways)|recap)\\b"},
       {"name": "email / message draft",   "weight": -2, "pattern": "\\b(email|e-mail|reply to|draft a (note|message)|slack message|thank[- ]you note|linkedin post)\\b"},
-      {"name": "simple lookup",           "weight": -2, "pattern": "^(what('s| is| are)|who is|when (is|was)|define|how do i|how to|what does)\\b"},
+      {"name": "simple lookup",           "weight": -2, "pattern": "^(what('s| is)|who is|when (is|was)|define|how do i|how to|what does)\\b"},
       {"name": "small code chore",        "weight": -2, "pattern": "\\b(rename|typo|fix (the )?(typo|indentation|lint|import)|add (a )?comment|docstring|regex|git (command|log|status|rebase)|excel formula|vlookup|xlookup)\\b"},
-      {"name": "slide / doc touch-up",    "weight": -2, "pattern": "\\b(slide title|headline|action title|speaker notes|exec(utive)? summary bullet|one[- ]liner)\\b"},
+      {"name": "slide / doc touch-up",    "weight": -2, "pattern": "\\b(slide titles?|headlines?|action titles?|speaker notes|exec(utive)? summary bullets?|one[- ]liner|page titles?|tracker update)\\b"},
+      {"name": "meeting admin",           "weight": -2, "pattern": "\\b(action items|meeting notes|minutes|agenda|calendar invite|out[- ]of[- ]office)\\b"},
 
-      {"name": "architecture / design",   "weight": 3,  "pattern": "\\b(architect(ure)?|system design|design (a|the) (system|service|pipeline|data model)|scalab(le|ility))\\b"},
+      {"name": "architecture / design",   "weight": 3,  "pattern": "\\b(architect(ure)?|system design|design (a|the|our)( [a-z-]+)? (system|service|pipeline|data model|platform|architecture)|scalab(le|ility))\\b"},
       {"name": "hard debugging",          "weight": 3,  "pattern": "\\b(race condition|deadlock|memory leak|intermittent|flaky|heisenbug|root cause|segfault|concurrency)\\b"},
       {"name": "large refactor / migration", "weight": 3, "pattern": "\\b(refactor (the|this|our) (codebase|module|service)|migrat(e|ion)|rewrite (the|our) (service|system)|across (the|all) (files|repo|codebase))\\b"},
       {"name": "security / correctness",  "weight": 3,  "pattern": "\\b(security (review|audit)|vulnerab|threat model|formal(ly)? (proof|verify)|prove that|invariant)\\b"},
-      {"name": "strategic analysis",      "weight": 3,  "pattern": "\\b(due diligence|market sizing|tam|business case|valuation|dcf|scenario (analysis|model)|trade-?offs?|competitive (landscape|analysis)|synthesi[sz]e (the|these|across))\\b"},
+      {"name": "strategic analysis",      "weight": 3,  "pattern": "\\b(due diligence|market sizing|tam|business case|valuation|dcf|scenario (analysis|model)|trade-?offs?|competitive (landscape|analysis)|synthesi[sz]e (the|these|across)|cost transformation|operating model|org(anisation|anization)? design|go[- ]to[- ]market|post[- ]merger|synerg(y|ies)|investment thesis|m&a)\\b"},
+      {"name": "problem structuring",     "weight": 3,  "pattern": "\\b(issue tree|hypothes[ie]s|workplan|mece|driver tree|value driver|logic tree)\\b"},
+      {"name": "critical review",         "weight": 3,  "pattern": "\\b(red[- ]team|weakest assumptions?|stress[- ]test|pressure[- ]test|poke holes|challenge (our|the|this) (recommendation|thesis|logic))\\b"},
+      {"name": "judgement call",          "weight": 2,  "pattern": "\\b(risks?|recommend(ation|s)?|should (we|i)|what do you think|prioriti[sz]e|point of view|implications?)\\b"},
       {"name": "multi-step planning",     "weight": 2,  "pattern": "\\b(step[- ]by[- ]step plan|implementation plan|roadmap|end[- ]to[- ]end|multi[- ]step|investigate)\\b"},
       {"name": "explicit deep thinking",  "weight": 4,  "pattern": "\\b(think (hard|carefully|deeply)|ultrathink|reason carefully|be rigorous)\\b"},
-      {"name": "data / modelling",        "weight": 2,  "pattern": "\\b(statistical|regression|forecast(ing)?|optimi[sz]ation model|monte carlo|sensitivity analysis)\\b"}
+      {"name": "data / modelling",        "weight": 3,  "pattern": "\\b(statistical|regression|forecast(ing)? model|optimi[sz]ation model|monte carlo|sensitivity analysis|segmentation|segment the|conjoint|cohort analysis)\\b"}
     ]
   }
 }
