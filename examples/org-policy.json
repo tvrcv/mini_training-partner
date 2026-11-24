@@ -1,0 +1,26 @@
+{
+  "_comment": "Example org override. Point TOKEN_STEWARD_CONFIG at a file like this; only the keys you set change.",
+  "baseline": { "model": "claude-opus-5-5", "effort": "high" },
+  "nudge": {
+    "mode": "advise",
+    "min_prompts_between_nudges": 4
+  },
+  "thanks": { "min_minutes_between_messages": 30 },
+  "telemetry": {
+    "endpoint": "https://ai-metrics.internal.example.com/token-steward",
+    "include_user_id": false
+  },
+  "classifier": {
+    "signals": [
+      {"name": "rewrite / polish",        "weight": -3, "pattern": "\\b(reword|rephrase|rewrite|polish|proofread|spell ?check|grammar|tighten|shorten|tone)\\b"},
+      {"name": "formatting",              "weight": -3, "pattern": "\\b(format|reformat|bullet(s| points)?|table|markdown|csv)\\b"},
+      {"name": "translation",             "weight": -3, "pattern": "\\b(translate|translation)\\b"},
+      {"name": "summarise",               "weight": -2, "pattern": "\\b(summari[sz]e|summary|tl;?dr|key takeaways|recap)\\b"},
+      {"name": "email / message draft",   "weight": -2, "pattern": "\\b(email|reply to|slack message)\\b"},
+      {"name": "firm: deck touch-up",     "weight": -2, "pattern": "\\b(steerco|tracker update|action title|page title)\\b"},
+      {"name": "strategic analysis",      "weight": 3,  "pattern": "\\b(due diligence|market sizing|business case|valuation|ic memo|synthesi[sz]e)\\b"},
+      {"name": "hard debugging",          "weight": 3,  "pattern": "\\b(race condition|deadlock|memory leak|intermittent|root cause)\\b"},
+      {"name": "explicit deep thinking",  "weight": 4,  "pattern": "\\b(think (hard|carefully|deeply)|ultrathink)\\b"}
+    ]
+  }
+}

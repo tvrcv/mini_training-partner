@@ -1,0 +1,126 @@
+{
+  "_comment": "Token Steward defaults. Org admins: override any key by pointing TOKEN_STEWARD_CONFIG at a JSON file (deep-merged over this one), or fork this file. Prices are USD per 1M tokens, Anthropic first-party API list prices as of 2026-11. Update when pricing changes or if you buy through Bedrock/Vertex/an enterprise agreement.",
+
+  "currency_symbol": "$",
+
+  "pricing": {
+    "claude-fable-5-2":  {"label": "Fable 5.2",  "tier": 4, "input": 8.00,  "output": 40.00, "cache_write": 10.00, "cache_read": 0.20},
+    "claude-mythos-5-2": {"label": "Mythos 5.2", "tier": 4, "input": 8.00,  "output": 40.00, "cache_write": 10.00, "cache_read": 0.20},
+    "claude-fable-5-1":  {"label": "Fable 5.1",  "tier": 4, "input": 10.00, "output": 50.00, "cache_write": 12.50, "cache_read": 1.00},
+    "claude-fable-5":    {"label": "Fable 5",    "tier": 4, "input": 10.00, "output": 50.00, "cache_write": 12.50, "cache_read": 1.00},
+    "claude-opus-5-5":   {"label": "Opus 5.5",   "tier": 3, "input": 4.00,  "output": 20.00, "cache_write": 5.00,  "cache_read": 0.20},
+    "claude-opus-5":     {"label": "Opus 5",     "tier": 3, "input": 5.00,  "output": 25.00, "cache_write": 6.25,  "cache_read": 0.50},
+    "claude-opus-4-8":   {"label": "Opus 4.8",   "tier": 3, "input": 5.00,  "output": 25.00, "cache_write": 6.25,  "cache_read": 0.50},
+    "claude-opus-4-7":   {"label": "Opus 4.7",   "tier": 3, "input": 5.00,  "output": 25.00, "cache_write": 6.25,  "cache_read": 0.50},
+    "claude-opus-4-6":   {"label": "Opus 4.6",   "tier": 3, "input": 5.00,  "output": 25.00, "cache_write": 6.25,  "cache_read": 0.50},
+    "claude-sonnet-5-5": {"label": "Sonnet 5.5", "tier": 2, "input": 2.00,  "output": 10.00, "cache_write": 2.50,  "cache_read": 0.10},
+    "claude-sonnet-5":   {"label": "Sonnet 5",   "tier": 2, "input": 2.00,  "output": 10.00, "cache_write": 2.50,  "cache_read": 0.20},
+    "claude-sonnet-4-6": {"label": "Sonnet 4.6", "tier": 2, "input": 3.00,  "output": 15.00, "cache_write": 3.75,  "cache_read": 0.30},
+    "claude-haiku-5-5":  {"label": "Haiku 5.5",  "tier": 1, "input": 0.10,  "output": 0.50,  "cache_write": 0.125, "cache_read": 0.01},
+    "claude-haiku-4-5":  {"label": "Haiku 4.5",  "tier": 1, "input": 1.00,  "output": 5.00,  "cache_write": 1.25,  "cache_read": 0.10}
+  },
+
+  "_aliases_comment": "Maps Claude Code model aliases (settings 'model', /model) to the model they currently resolve to. Keep in sync with your Claude Code version.",
+  "aliases": {
+    "fable": "claude-fable-5-2",
+    "opus": "claude-opus-5-5",
+    "opusplan": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-5-5",
+    "best": "claude-fable-5-2"
+  },
+
+  "_tier_commands_comment": "What we tell people to type to move to a tier.",
+  "tier_commands": {"1": "/model haiku", "2": "/model sonnet", "3": "/model opus", "4": "/model fable"},
+  "tier_names": {"1": "Haiku", "2": "Sonnet", "3": "Opus", "4": "Fable"},
+
+  "effort_levels": ["low", "medium", "high", "xhigh", "max"],
+
+  "_default_effort_comment": "Effort a model runs at when nothing sets it explicitly. Used only when Token Steward cannot read the effort from the session.",
+  "default_effort_by_tier": {"1": "medium", "2": "high", "3": "medium", "4": "high"},
+
+  "_effort_output_multiplier_comment": "Relative output-token volume (thinking + answer) per effort level, medium = 1.0. These are conservative planning assumptions used ONLY to estimate the effort component of savings. Run /token-steward:savings --calibration to compare against what your own sessions show, and tune here.",
+  "effort_output_multiplier": {"low": 0.6, "medium": 1.0, "high": 1.5, "xhigh": 2.0, "max": 2.8},
+
+  "baseline": {
+    "_comment": "Savings are measured against this reference configuration: 'what this work would have cost on the premium setup'. Shown to users in every savings message so the claim is transparent.",
+    "model": "claude-opus-5-5",
+    "effort": "high"
+  },
+
+  "recommendations": {
+    "_comment": "Suggested configuration per task class. Nudges fire only when the session is meaningfully above this.",
+    "trivial": {"tier": 1, "effort": "low"},
+    "routine": {"tier": 2, "effort": "medium"},
+    "general": null,
+    "complex": null
+  },
+
+  "nudge": {
+    "enabled": true,
+    "_mode_comment": "'advise' = never blocks, shows a tip. 'confirm' = for severe mismatches only, the first submission is held with an explanation; re-sending the same prompt goes through unchanged.",
+    "mode": "advise",
+    "min_severity": 2,
+    "confirm_min_severity": 5,
+    "min_prompts_between_nudges": 3,
+    "min_minutes_between_nudges": 10,
+    "max_nudges_per_session": 4,
+    "stop_after_consecutive_ignored": 3,
+    "concise_hint_for_trivial": false
+  },
+
+  "thanks": {
+    "enabled": true,
+    "min_turn_savings_usd": 0.01,
+    "min_minutes_between_messages": 15
+  },
+
+  "session_banner": {
+    "enabled": true,
+    "once_per_day": true
+  },
+
+  "default_turn_tokens": {
+    "_comment": "Used to estimate per-prompt savings in a nudge before this user has their own history.",
+    "trivial": {"input": 25000, "cache_read": 20000, "output": 1500},
+    "routine": {"input": 40000, "cache_read": 35000, "output": 4000},
+    "general": {"input": 60000, "cache_read": 50000, "output": 8000},
+    "complex": {"input": 80000, "cache_read": 70000, "output": 12000}
+  },
+
+  "telemetry": {
+    "_comment": "Optional. If set, each completed turn's anonymous metrics record (no prompt or response text, ever) is POSTed as JSON to this URL. Leave empty to keep everything on the user's machine.",
+    "endpoint": "",
+    "timeout_seconds": 2,
+    "include_user_id": false
+  },
+
+  "classifier": {
+    "_comment": "Local, zero-cost heuristic. Patterns are case-insensitive regular expressions. Weights: positive pushes toward 'complex', negative toward 'trivial'. Tune for your firm's work.",
+    "_thresholds_comment": "A task is only called trivial/routine when at least one 'light work' signal matched. Everything without clear evidence is 'general' and never nudged.",
+    "trivial_max_score": -4,
+    "routine_max_score": -1,
+    "complex_min_score": 3,
+    "short_prompt_words": 25,
+    "long_prompt_words": 250,
+    "signals": [
+      {"name": "rewrite / polish",        "weight": -3, "pattern": "\\b(reword|rephrase|rewrite|polish|proofread|spell ?check|grammar|tighten|shorten|make (it|this) (shorter|longer|clearer|more (formal|concise|professional))|tone)\\b"},
+      {"name": "formatting",              "weight": -3, "pattern": "\\b(format|reformat|bullet(s| points)?|table|markdown|capitali[sz]e|indent|sort (this|these|alphabetically)|convert (this|to)|csv|json to|to json)\\b"},
+      {"name": "translation",             "weight": -3, "pattern": "\\b(translate|translation|in (french|german|spanish|portuguese|italian|japanese|chinese|english))\\b"},
+      {"name": "summarise",               "weight": -2, "pattern": "\\b(summari[sz]e|summary|tl;?dr|key (points|takeaways)|recap)\\b"},
+      {"name": "email / message draft",   "weight": -2, "pattern": "\\b(email|e-mail|reply to|draft a (note|message)|slack message|thank[- ]you note|linkedin post)\\b"},
+      {"name": "simple lookup",           "weight": -2, "pattern": "^(what('s| is| are)|who is|when (is|was)|define|how do i|how to|what does)\\b"},
+      {"name": "small code chore",        "weight": -2, "pattern": "\\b(rename|typo|fix (the )?(typo|indentation|lint|import)|add (a )?comment|docstring|regex|git (command|log|status|rebase)|excel formula|vlookup|xlookup)\\b"},
+      {"name": "slide / doc touch-up",    "weight": -2, "pattern": "\\b(slide title|headline|action title|speaker notes|exec(utive)? summary bullet|one[- ]liner)\\b"},
+
+      {"name": "architecture / design",   "weight": 3,  "pattern": "\\b(architect(ure)?|system design|design (a|the) (system|service|pipeline|data model)|scalab(le|ility))\\b"},
+      {"name": "hard debugging",          "weight": 3,  "pattern": "\\b(race condition|deadlock|memory leak|intermittent|flaky|heisenbug|root cause|segfault|concurrency)\\b"},
+      {"name": "large refactor / migration", "weight": 3, "pattern": "\\b(refactor (the|this|our) (codebase|module|service)|migrat(e|ion)|rewrite (the|our) (service|system)|across (the|all) (files|repo|codebase))\\b"},
+      {"name": "security / correctness",  "weight": 3,  "pattern": "\\b(security (review|audit)|vulnerab|threat model|formal(ly)? (proof|verify)|prove that|invariant)\\b"},
+      {"name": "strategic analysis",      "weight": 3,  "pattern": "\\b(due diligence|market sizing|tam|business case|valuation|dcf|scenario (analysis|model)|trade-?offs?|competitive (landscape|analysis)|synthesi[sz]e (the|these|across))\\b"},
+      {"name": "multi-step planning",     "weight": 2,  "pattern": "\\b(step[- ]by[- ]step plan|implementation plan|roadmap|end[- ]to[- ]end|multi[- ]step|investigate)\\b"},
+      {"name": "explicit deep thinking",  "weight": 4,  "pattern": "\\b(think (hard|carefully|deeply)|ultrathink|reason carefully|be rigorous)\\b"},
+      {"name": "data / modelling",        "weight": 2,  "pattern": "\\b(statistical|regression|forecast(ing)?|optimi[sz]ation model|monte carlo|sensitivity analysis)\\b"}
+    ]
+  }
+}

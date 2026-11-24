@@ -1,0 +1,26 @@
+{
+  "description": "Token Steward: right-size model and effort, and show what that saves.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py\" hook session-start", "timeout": 10}
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py\" hook user-prompt-submit", "timeout": 5}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py\" hook stop", "timeout": 10}
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "ai-stewardship": {
+      "source": { "source": "github", "repo": "YOUR-ORG/mini_training-partner" }
+    }
+  },
+  "enabledPlugins": {
+    "token-steward@ai-stewardship": true
+  },
+  "env": {
+    "TOKEN_STEWARD_BASELINE_MODEL": "claude-opus-5-5",
+    "TOKEN_STEWARD_BASELINE_EFFORT": "high"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "token-steward",
+  "displayName": "Token Steward",
+  "version": "1.0.0",
+  "description": "Guardrails for thoughtful AI use: spots light tasks running on heavyweight model/effort settings, suggests a right-sized setup without ever blocking work, and shows how much each right-sized task saved.",
+  "author": {"name": "AI Enablement"},
+  "license": "MIT",
+  "keywords": ["cost", "tokens", "effort", "model-selection", "governance", "finops"]
+}

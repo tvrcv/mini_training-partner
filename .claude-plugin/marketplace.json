@@ -1,0 +1,13 @@
+{
+  "name": "ai-stewardship",
+  "owner": {"name": "AI Enablement"},
+  "metadata": {"description": "Internal plugins for responsible, cost-aware AI use."},
+  "plugins": [
+    {
+      "name": "token-steward",
+      "source": "./plugins/token-steward",
+      "description": "Right-size model and reasoning effort, and see what it saves.",
+      "category": "productivity"
+    }
+  ]
+}

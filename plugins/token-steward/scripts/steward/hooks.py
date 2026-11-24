@@ -1,0 +1,313 @@
+"""Hook handlers. Each takes the hook's stdin JSON and returns the JSON to print (or {}).
+
+Design rules that every handler follows:
+  * Never slow anyone down: no network on the prompt path, no LLM calls, fail open on any error.
+  * Inform, don't police: in the default 'advise' mode nothing is ever blocked.
+  * Be sparing: cooldowns, a per-session cap, and back-off when tips keep being ignored.
+  * Be honest: every savings figure names the configuration it is compared against.
+"""
+
+import getpass
+import hashlib
+import json
+import socket
+import time
+import urllib.request
+from datetime import datetime, timezone
+
+from . import classifier, detect, pricing, store, transcript
+
+PREFIX = "Token Steward · "
+
+CLASS_PHRASES = {
+    "trivial": "a quick, lightweight request",
+    "routine": "a routine request",
+}
+
+
+# ---- helpers ---------------------------------------------------------------------------------
+
+def _severity(cfg, model_key, effort, rec):
+    model_gap = max(0, pricing.tier_of(cfg, model_key) - rec["tier"])
+    cur_rank = pricing.effort_rank(cfg, effort)
+    rec_rank = pricing.effort_rank(cfg, rec["effort"])
+    effort_gap = max(0, cur_rank - rec_rank) if cur_rank is not None else 0
+    return 2 * model_gap + effort_gap, model_gap, effort_gap
+
+
+def _typical_usage(cfg, task_class):
+    """This user's median-ish turn size for the class (last 50 turns), else configured defaults."""
+    rows = [r for r in store.read_ledger()[-400:] if r.get("task_class") == task_class][-50:]
+    if len(rows) >= 5:
+        usage = {}
+        for k in pricing.USAGE_KEYS:
+            values = sorted(r["tokens"].get(k, 0) for r in rows)
+            usage[k] = values[len(values) // 2]
+        return usage, "medium"  # stored tokens are real; treat as observed at their own effort
+    return dict(cfg["default_turn_tokens"].get(task_class) or cfg["default_turn_tokens"]["general"]), "medium"
+
+
+def _estimate_saving(cfg, task_class, cur_model, cur_effort, rec_model, rec_effort):
+    usage, ref_effort = _typical_usage(cfg, task_class)
+    now = pricing.counterfactual_cost(cfg, usage, ref_effort, cur_model, cur_effort or ref_effort)
+    rec = pricing.counterfactual_cost(cfg, usage, ref_effort, rec_model, rec_effort)
+    pct = round(100 * (now - rec) / now) if now > 0 else 0
+    return now - rec, pct
+
+
+def _nudge_allowed(cfg, state):
+    n = cfg["nudge"]
+    if not n.get("enabled", True) or store.is_snoozed():
+        return False
+    if state["nudges_shown"] >= n["max_nudges_per_session"]:
+        return False
+    if state["consecutive_ignored"] >= n["stop_after_consecutive_ignored"]:
+        return False
+    if state["last_nudge_prompt"] is not None:
+        if state["prompt_count"] - state["last_nudge_prompt"] < n["min_prompts_between_nudges"]:
+            return False
+        if time.time() - state["last_nudge_ts"] < n["min_minutes_between_nudges"] * 60:
+            return False
+    return True
+
+
+def _build_nudge(cfg, state, task_class, matched, model_key, effort, rec, model_gap, effort_gap, prompt):
+    rec_model = pricing.model_for_tier(cfg, rec["tier"]) if model_gap else model_key
+    rec_effort = rec["effort"] if effort_gap else effort
+    saving, pct = _estimate_saving(cfg, task_class, model_key, effort, rec_model, rec_effort)
+
+    light = [m for m in matched if any(s["name"] == m and s["weight"] < 0 for s in cfg["classifier"]["signals"])]
+    what = CLASS_PHRASES.get(task_class, "a lighter request")
+    if light:
+        what += f" ({', '.join(light[:2])})"
+
+    current = f"{pricing.label_of(cfg, model_key)}" + (f" at {effort} effort" if effort else "")
+    target = f"{pricing.label_of(cfg, rec_model)}" + (f" at {rec_effort} effort" if rec_effort else "")
+    steps = []
+    if model_gap:
+        steps.append(cfg["tier_commands"][str(rec["tier"])])
+    if effort_gap:
+        steps.append(f"/effort {rec_effort}")
+
+    msg = (f"{PREFIX}This looks like {what}. You're on {current}, which is built for complex, "
+           f"multi-step work. {target} typically handles requests like this just as well")
+    if saving >= 0.005 and pct > 0:
+        msg += f", at about {pct}% lower cost (≈{pricing.fmt_money(cfg, saving)} per request like this)"
+    msg += f". To switch for what follows: {' then '.join(steps)}."
+    if "ultrathink" in (prompt or "").lower():
+        msg += " Note: 'ultrathink' raises this prompt to maximum reasoning, which is rarely needed here."
+    msg += " Your request is running as-is."
+    if state["nudges_shown"] == 0:
+        msg += " (Pause tips any time with /token-steward:snooze.)"
+    return msg, rec_model, rec_effort
+
+
+def _post_telemetry(cfg, record):
+    t = cfg.get("telemetry") or {}
+    if not t.get("endpoint"):
+        return
+    payload = dict(record)
+    payload["session"] = hashlib.sha256(str(record.get("session", "")).encode()).hexdigest()[:16]
+    if t.get("include_user_id"):
+        ident = f"{getpass.getuser()}@{socket.gethostname()}"
+        payload["user"] = hashlib.sha256(ident.encode()).hexdigest()[:16]
+    req = urllib.request.Request(
+        t["endpoint"], data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}
+    )
+    try:
+        urllib.request.urlopen(req, timeout=t.get("timeout_seconds", 2)).close()
+    except Exception:
+        pass  # telemetry must never affect the session
+
+
+# ---- SessionStart ----------------------------------------------------------------------------
+
+def on_session_start(cfg, inp):
+    sid = inp.get("session_id")
+    state = store.load_session(sid)
+    if inp.get("model"):
+        state["model_at_start"] = inp["model"]
+    store.save_session(sid, state)
+
+    if inp.get("source") not in (None, "startup"):
+        return {}
+    store.prune_sessions()
+
+    banner = cfg.get("session_banner") or {}
+    prefs = store.load_prefs()
+    today = datetime.now().strftime("%Y-%m-%d")
+    if not banner.get("enabled", True) or store.is_snoozed(prefs):
+        return {}
+    if banner.get("once_per_day", True) and prefs.get("last_banner_day") == today:
+        return {}
+    prefs["last_banner_day"] = today
+    store.save_prefs(prefs)
+
+    totals = store.load_totals()
+    month_saved = totals["by_month"].get(store.month_key(), {}).get("savings", 0.0)
+    model_key = pricing.resolve_model(cfg, inp.get("model"))
+    msg = (f"{PREFIX}Match the model to the task: Haiku for quick edits and lookups, Sonnet for "
+           f"everyday drafting and coding, Opus or Fable for genuinely hard problems.")
+    if model_key:
+        msg += f" This session starts on {pricing.label_of(cfg, model_key)}."
+    if month_saved >= 0.01:
+        msg += f" You've saved {pricing.fmt_money(cfg, month_saved)} this month."
+    msg += " Playbook: /token-steward:guide"
+    return {"systemMessage": msg}
+
+
+# ---- UserPromptSubmit ------------------------------------------------------------------------
+
+def on_user_prompt_submit(cfg, inp):
+    sid = inp.get("session_id")
+    prompt = inp.get("prompt") or ""
+    state = store.load_session(sid)
+    state["prompt_count"] += 1
+    state["turn_start_offset"] = transcript.file_size(inp.get("transcript_path"))
+    state["nudged_this_turn"] = False
+
+    task_class, _score, matched = classifier.classify(cfg, prompt)
+    if task_class != "continuation":
+        state["task_class"] = task_class
+
+    out = {}
+    rec = cfg["recommendations"].get(task_class)
+    model_key = detect.current_model(cfg, inp, state)
+    effort = detect.current_effort(cfg, inp, state, model_key, prompt)
+    state["predicted_model"], state["predicted_effort"] = model_key, effort
+
+    if rec and model_key:
+        severity, model_gap, effort_gap = _severity(cfg, model_key, effort, rec)
+        n = cfg["nudge"]
+        prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()[:16]
+
+        if prompt_hash in state["held_prompt_hashes"]:
+            # A re-send after a 'confirm' hold: the person has decided. Let it through quietly.
+            state["held_prompt_hashes"].remove(prompt_hash)
+        elif severity >= n["min_severity"] and _nudge_allowed(cfg, state):
+            msg, rec_model, rec_effort = _build_nudge(
+                cfg, state, task_class, matched, model_key, effort, rec, model_gap, effort_gap, prompt)
+            state["nudges_shown"] += 1
+            state["last_nudge_prompt"] = state["prompt_count"]
+            state["last_nudge_ts"] = time.time()
+            state["nudged_this_turn"] = True
+            state["pending_nudge"] = {
+                "prompt": state["prompt_count"],
+                "from_tier": pricing.tier_of(cfg, model_key),
+                "from_effort_rank": pricing.effort_rank(cfg, effort),
+            }
+            if n.get("mode") == "confirm" and severity >= n["confirm_min_severity"]:
+                state["held_prompt_hashes"] = (state["held_prompt_hashes"] + [prompt_hash])[-20:]
+                out = {"decision": "block", "reason": msg.replace(
+                    " Your request is running as-is.",
+                    " Switch first, or press Enter on the same prompt again to run it as-is.")}
+            else:
+                out = {"systemMessage": msg}
+
+        if task_class == "trivial" and n.get("concise_hint_for_trivial") and out.get("decision") != "block":
+            out.setdefault("hookSpecificOutput", {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": "This request looks simple. Answer directly and concisely; "
+                                     "avoid extended exploration unless it is actually needed.",
+            })
+
+    store.save_session(sid, state)
+    return out
+
+
+# ---- Stop ------------------------------------------------------------------------------------
+
+def on_stop(cfg, inp):
+    sid = inp.get("session_id")
+    path = inp.get("transcript_path")
+    state = store.load_session(sid)
+    by_model, n_responses = transcript.turn_usage(path, state.get("turn_start_offset"))
+    state["turn_start_offset"] = transcript.file_size(path)  # a resumed turn won't be double-counted
+    if n_responses == 0:
+        store.save_session(sid, state)
+        return {}
+
+    effort = (inp.get("effort") or {}).get("level") or state.get("predicted_effort")
+    if effort in cfg["effort_levels"]:
+        state["last_effort"], state["last_effort_ts"] = effort, time.time()
+
+    base = cfg["baseline"]
+    base_key = pricing.resolve_model(cfg, base["model"])
+    totals_usage = {k: 0 for k in pricing.USAGE_KEYS}
+    cost = baseline_cost = 0.0
+    primary, primary_out = None, -1
+    for raw_model, usage in by_model.items():
+        key = pricing.resolve_model(cfg, raw_model)
+        if not key:
+            continue  # unknown/unpriced model: don't guess
+        cost += pricing.cost(cfg, key, usage)
+        baseline_cost += pricing.counterfactual_cost(cfg, usage, effort, base_key, base["effort"])
+        for k in pricing.USAGE_KEYS:
+            totals_usage[k] += usage[k]
+        if usage["output"] > primary_out:
+            primary, primary_out = key, usage["output"]
+    if primary is None:
+        store.save_session(sid, state)
+        return {}
+    savings = baseline_cost - cost
+
+    # Did the person act on an earlier tip? (Judged on what actually ran, not on settings.)
+    accepted = False
+    pending = state.get("pending_nudge")
+    if pending and state["prompt_count"] > pending["prompt"]:
+        tier_now = pricing.tier_of(cfg, primary)
+        rank_now = pricing.effort_rank(cfg, effort)
+        if tier_now < pending["from_tier"] or (
+                rank_now is not None and pending["from_effort_rank"] is not None
+                and rank_now < pending["from_effort_rank"]):
+            accepted = True
+            state["pending_nudge"] = None
+            state["consecutive_ignored"] = 0
+        elif state["prompt_count"] - pending["prompt"] >= 2:
+            state["pending_nudge"] = None
+            state["consecutive_ignored"] += 1
+
+    now = time.time()
+    record = {
+        "v": 1,
+        "ts": now,
+        "date": datetime.fromtimestamp(now, tz=timezone.utc).isoformat(timespec="seconds"),
+        "session": sid,
+        "model": primary,
+        "tier": pricing.tier_of(cfg, primary),
+        "effort": effort,
+        "task_class": state.get("task_class"),
+        "responses": n_responses,
+        "tokens": totals_usage,
+        "cost": round(cost, 6),
+        "baseline": f"{base_key}@{base['effort']}",
+        "baseline_cost": round(baseline_cost, 6),
+        "savings": round(savings, 6),
+        "nudged": bool(state.get("nudged_this_turn")),
+        "nudge_accepted": accepted,
+    }
+    store.append_ledger(record)
+    totals = store.add_to_totals(record)
+    state["session_cost"] += cost
+    state["session_savings"] += max(savings, 0.0)
+    _post_telemetry(cfg, record)
+
+    out = {}
+    th = cfg.get("thanks") or {}
+    cooled = now - state.get("last_thanks_ts", 0) >= th.get("min_minutes_between_messages", 15) * 60
+    if th.get("enabled", True) and not store.is_snoozed() and savings >= th.get("min_turn_savings_usd", 0.01) \
+            and (accepted or cooled):
+        money = lambda x: pricing.fmt_money(cfg, x)  # noqa: E731
+        month = totals["by_month"].get(store.month_key(now), {}).get("savings", 0.0)
+        opener = "Thanks for switching, and for considering your usage." if accepted \
+            else "Thank you for considering your usage."
+        msg = (f"{PREFIX}{opener} This task ran on {pricing.label_of(cfg, primary)}"
+               f"{f' @ {effort}' if effort else ''} for {money(cost)}, about {money(savings)} less than "
+               f"{pricing.label_of(cfg, base_key)} @ {base['effort']}. You've saved the business "
+               f"{money(state['session_savings'])} this session, {money(month)} this month and "
+               f"{money(totals['all_time']['savings'])} in total.")
+        out = {"systemMessage": msg}
+        state["last_thanks_ts"] = now
+
+    store.save_session(sid, state)
+    return out
