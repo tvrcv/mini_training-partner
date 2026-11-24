@@ -46,6 +46,22 @@
     };
   }
   const save = (...keys) => storageSet(Object.fromEntries(keys.map((k) => [k, store[k]])));
+
+  // Every claude.ai tab runs its own copy of this script. Each update takes a lock shared by all
+  // claude.ai tabs (Web Locks are per origin), re-reads storage, applies the change and writes it
+  // back, so one tab never overwrites another tab's totals or ledger.
+  let queue = Promise.resolve();
+  function mutate(fn) {
+    const apply = async () => {
+      store = await loadStore();
+      const result = fn(store);
+      await save("state", "totals", "ledger");
+      return result;
+    };
+    const locked = () => (navigator.locks ? navigator.locks.request("token-steward-store", apply) : apply());
+    queue = queue.then(locked).catch(() => undefined);
+    return queue;
+  }
   const monthKey = (t) => new Date(t).toISOString().slice(0, 7);
   const today = () => new Date().toISOString().slice(0, 10);
   const snoozed = () => Date.now() < (store.prefs.snoozeUntil || 0);
@@ -95,14 +111,15 @@
     ui.showTip(tip, dom.composerRoot(dom.composer()));
     if (!draft.counted) {
       draft.counted = true;
-      const s = store.state;
-      s.lastTipMessage = s.messageCount + 1;
-      s.lastTipTs = Date.now();
-      if (s.tipsDay !== today()) { s.tipsDay = today(); s.tipsToday = 0; }
-      s.tipsToday += 1;
-      s.pending = { message: s.messageCount + 1, fromTier: tip.fromTier, fromEffortRank: tip.fromEffortRank };
-      store.totals.tipsShown += 1;
-      save("state", "totals");
+      mutate((st) => {
+        const s = st.state;
+        s.lastTipMessage = s.messageCount + 1;
+        s.lastTipTs = Date.now();
+        if (s.tipsDay !== today()) { s.tipsDay = today(); s.tipsToday = 0; }
+        s.tipsToday += 1;
+        s.pending = { message: s.messageCount + 1, fromTier: tip.fromTier, fromEffortRank: tip.fromEffortRank };
+        st.totals.tipsShown += 1;
+      });
     }
   }
 
@@ -121,9 +138,12 @@
     interceptSend(ev);
   }
 
+  let lastSend = { text: null, at: 0 };  // in memory only, to ignore a duplicate event for one send
+
   function interceptSend(ev) {
     const text = dom.promptText();
     if (!text) return;
+    if (text === lastSend.text && Date.now() - lastSend.at < 1000) return;
     if (bypassNextSend) { bypassNextSend = false; recordSend(text); return; }
 
     const p = cfg.policy;
@@ -147,35 +167,49 @@
   }
 
   function recordSend(text) {
-    const s = store.state;
+    lastSend = { text, at: Date.now() };
+    settleInflight();  // a quick follow-up must not discard the previous reply's measurement
     const { modelKey, effort } = currentSetup();
-    s.messageCount += 1;
+    const turn = modelKey ? { accepted: false } : null;
 
-    let accepted = false;
-    if (s.pending && s.messageCount > s.pending.message && modelKey) {
-      const tier = Core.tierOf(cfg, modelKey), rank = Core.effortRank(cfg, effort);
-      if (tier < s.pending.fromTier || (rank !== null && s.pending.fromEffortRank !== null && rank < s.pending.fromEffortRank)) {
-        accepted = true;
-        s.pending = null;
-        s.consecutiveIgnored = 0;
-        store.totals.tipsAccepted += 1;
-      } else if (s.messageCount - s.pending.message >= 2) {
-        s.pending = null;
-        s.consecutiveIgnored += 1;
+    mutate((st) => {
+      const s = st.state;
+      s.messageCount += 1;
+      if (s.pending && s.messageCount > s.pending.message && modelKey) {
+        const tier = Core.tierOf(cfg, modelKey), rank = Core.effortRank(cfg, effort);
+        if (tier < s.pending.fromTier || (rank !== null && s.pending.fromEffortRank !== null && rank < s.pending.fromEffortRank)) {
+          if (turn) turn.accepted = true;
+          s.pending = null;
+          s.consecutiveIgnored = 0;
+          st.totals.tipsAccepted += 1;
+        } else if (s.messageCount - s.pending.message >= 2) {
+          s.pending = null;
+          s.consecutiveIgnored += 1;
+        }
       }
-    }
-    save("state", "totals");
+    });
 
-    inflight = modelKey ? {
-      modelKey, effort, accepted, taskClass: Core.classify(cfg, text).taskClass, tipped: !!draft.tip,
+    inflight = turn && Object.assign(turn, {
+      modelKey, effort, taskClass: Core.classify(cfg, text).taskClass, tipped: !!draft.tip,
       promptChars: text.length, historyChars: dom.historyChars(), startReply: dom.lastReplyText(), startCount: dom.replyCount(),
       sentAt: Date.now(), sawStreaming: false, stableTicks: 0, lastLen: -1
-    } : null;
+    });
     draft = { id: draft.id + 1, tip: null, counted: false, dismissed: false };
     ui.hideTip();
   }
 
   // ---- reply finished -----------------------------------------------------------------------
+
+  // If the previous reply has visibly finished but tick() hasn't caught it yet, record it now.
+  function settleInflight() {
+    if (!inflight || dom.isStreaming()) return;
+    const reply = dom.lastReplyText();
+    if (reply && (dom.replyCount() > inflight.startCount || reply !== inflight.startReply)) {
+      const done = inflight;
+      inflight = null;
+      finishTurn(done, reply.length);
+    }
+  }
 
   function tick() {
     if (!inflight) return;
@@ -196,7 +230,7 @@
     finishTurn(done, reply.length);
   }
 
-  async function finishTurn(t, replyChars) {
+  function finishTurn(t, replyChars) {
     const priced = Core.priceTurn(cfg, { modelKey: t.modelKey, effort: t.effort, promptChars: t.promptChars,
                                          historyChars: t.historyChars, replyChars });
     const now = Date.now();
@@ -206,22 +240,22 @@
       baseline_cost: +priced.baselineCost.toFixed(6), savings: +priced.savings.toFixed(6),
       tipped: t.tipped, tip_accepted: t.accepted
     };
-    store.ledger.push(row);
-    if (store.ledger.length > LEDGER_MAX) store.ledger.splice(0, store.ledger.length - LEDGER_MAX);
-    const tot = store.totals;
-    const m = tot.byMonth[monthKey(now)] = tot.byMonth[monthKey(now)] || { cost: 0, baseline: 0, savings: 0, turns: 0 };
-    for (const b of [tot.allTime, m]) {
-      b.cost += row.cost; b.baseline += row.baseline_cost; b.savings += Math.max(0, row.savings); b.turns += 1;
-    }
-
-    const p = cfg.policy, s = store.state;
-    const cooled = now - (s.lastThanksTs || 0) >= p.thanksMinMinutesBetween * 60000;
-    if (p.enabled && !snoozed() && row.savings >= p.thanksMinSavingsUsd && (t.accepted || cooled)) {
-      ui.toast(Core.thanksText(cfg, priced, t.modelKey, t.effort,
-                               { month: m.savings, allTime: tot.allTime.savings }, t.accepted));
-      s.lastThanksTs = now;
-    }
-    await save("ledger", "totals", "state");
+    return mutate((st) => {
+      st.ledger.push(row);
+      if (st.ledger.length > LEDGER_MAX) st.ledger.splice(0, st.ledger.length - LEDGER_MAX);
+      const tot = st.totals;
+      const m = tot.byMonth[monthKey(now)] = tot.byMonth[monthKey(now)] || { cost: 0, baseline: 0, savings: 0, turns: 0 };
+      for (const b of [tot.allTime, m]) {
+        b.cost += row.cost; b.baseline += row.baseline_cost; b.savings += Math.max(0, row.savings); b.turns += 1;
+      }
+      const p = cfg.policy, s = st.state;
+      const cooled = now - (s.lastThanksTs || 0) >= p.thanksMinMinutesBetween * 60000;
+      if (p.enabled && !snoozed() && row.savings >= p.thanksMinSavingsUsd && (t.accepted || cooled)) {
+        ui.toast(Core.thanksText(cfg, priced, t.modelKey, t.effort,
+                                 { month: m.savings, allTime: tot.allTime.savings }, t.accepted));
+        s.lastThanksTs = now;
+      }
+    });
   }
 
   // ---- UI (shadow DOM so claude.ai styles and ours never collide) ---------------------------
@@ -329,10 +363,11 @@
     setInterval(tick, 1000);
     if (api && api.storage.onChanged) {
       api.storage.onChanged.addListener((changes, area) => {
-        if (area === "local" && changes.prefs) {
-          store.prefs = changes.prefs.newValue || store.prefs;
-          if (snoozed()) ui.hideTip();
+        if (area !== "local") return;
+        for (const key of ["prefs", "state", "totals", "ledger"]) {
+          if (changes[key] && changes[key].newValue) store[key] = changes[key].newValue;  // other tabs, popup
         }
+        if (changes.prefs && snoozed()) ui.hideTip();
       });
     }
     globalThis.__tokenStewardReady = true;

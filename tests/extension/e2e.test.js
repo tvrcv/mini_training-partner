@@ -114,3 +114,39 @@ test("tip while typing, no block on send, thanks after switching", { timeout: 60
     try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (e) { /* best effort */ }
   }
 });
+
+test("two claude.ai tabs both count towards the same totals", { timeout: 60000 }, async () => {
+  const { ctx, page, profile } = await launch();
+  try {
+    const page2 = await ctx.newPage();
+    await page2.goto("https://claude.ai/new");
+    for (const p of [page, page2]) {
+      await waitFor(() => p.evaluate(() => !!document.getElementById("token-steward-root")));
+      await p.evaluate(() => { document.getElementById("model").textContent = "Sonnet 5.5"; });
+    }
+    // Both tabs are used; a tab only sends again once its previous reply has finished, as on claude.ai.
+    const replyDone = (p) => waitFor(() => p.evaluate(() =>
+      !document.querySelector('[data-is-streaming="true"]') && !document.querySelector('[aria-label="Stop response"]')), 20000);
+    await page.bringToFront();
+    await type(page, "Summarize these meeting notes for the partner");
+    await page.keyboard.press("Enter");
+    await page2.bringToFront();
+    await type(page2, "Summarize this memo into key takeaways");
+    await page2.keyboard.press("Enter");
+    await page.bringToFront();
+    await replyDone(page);  // then send straight away: a quick follow-up must not lose the previous reply
+    await type(page, "Now translate the summary in french");
+    await page.keyboard.press("Enter");
+    // Background tabs throttle timers, so give the other tab's reply time to finish.
+    const local = await waitFor(async () => {
+      const l = await readStorage(ctx);
+      return l.totals && l.totals.allTime.turns >= 3 ? l : null;
+    }, 20000) || await readStorage(ctx);
+    assert.strictEqual(local.totals.allTime.turns, 3);
+    assert.strictEqual(local.ledger.length, 3);
+    assert.strictEqual(local.state.messageCount, 3);
+  } finally {
+    await ctx.close();
+    try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (e) { /* best effort */ }
+  }
+});

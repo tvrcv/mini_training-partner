@@ -22,6 +22,7 @@ const PROMPTS = [
   "Fix the typo in this slide title please",
   "Write an excel formula that does a vlookup across two tabs",
   "Build a market sizing model for the EU cold-chain logistics market with scenario analysis",
+  "Tidy up A.PY B.PY C.PY and D.PY please, they are messy",
 ];
 
 test("JS classifier agrees with the Python plugin classifier", () => {
@@ -82,4 +83,14 @@ test("extension config is in sync with the plugin's defaults.json", () => {
     assert.deepStrictEqual(shared[key], strip(defaults[key]),
       `${key} differs: run python3 tools/build_extension_config.py`);
   }
+});
+
+test("unknown baselineModel in policy falls back to the default", () => {
+  const c = Core.buildConfig(globalThis.TOKEN_STEWARD_SHARED, { baselineModel: "claude-opus-9", baselineEffort: "loud" });
+  assert.strictEqual(c.baseline.model, "claude-opus-5-5");
+  assert.strictEqual(c.baseline.effort, "high");
+  const priced = Core.priceTurn(c, { modelKey: "claude-haiku-5-5", effort: "low", promptChars: 100, historyChars: 0, replyChars: 400 });
+  assert.ok(priced.savings > 0);
+  const named = Core.buildConfig(globalThis.TOKEN_STEWARD_SHARED, { baselineModel: "Sonnet 5.5" });
+  assert.strictEqual(named.baseline.model, "claude-sonnet-5-5");
 });

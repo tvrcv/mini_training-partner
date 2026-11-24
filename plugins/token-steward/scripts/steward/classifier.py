@@ -9,7 +9,7 @@ import re
 from functools import lru_cache
 
 CODE_FENCE = re.compile(r"```")
-FILE_REF = re.compile(r"(@[\w./-]+|\b[\w-]+\.(py|ts|tsx|js|java|go|rs|sql|ipynb|xlsx|pptx|docx|csv)\b)")
+FILE_REF = re.compile(r"(@[\w./-]+|\b[\w-]+\.(py|ts|tsx|js|java|go|rs|sql|ipynb|xlsx|pptx|docx|csv)\b)", re.IGNORECASE)
 
 
 @lru_cache(maxsize=64)

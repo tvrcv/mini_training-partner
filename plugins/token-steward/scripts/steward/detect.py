@@ -9,7 +9,6 @@ UserPromptSubmit hooks receive neither the model nor the effort, so we infer the
 
 import json
 import os
-from datetime import datetime
 
 from . import pricing, transcript
 
@@ -38,24 +37,27 @@ def _settings_value(cwd, key):
     return found
 
 
-def _iso_to_epoch(ts):
-    if not ts:
-        return 0.0
-    try:
-        return datetime.fromisoformat(str(ts).replace("Z", "+00:00")).timestamp()
-    except ValueError:
-        return 0.0
+def settings_snapshot(cwd):
+    """The model and effort values the settings files currently hold. Saved at the end of each turn
+    so the next prompt can tell a real /model or /effort switch (the value changed) from an
+    unrelated settings write (theme, permissions), which changes the file but not these values."""
+    return {"model": _settings_value(cwd, "model")[0], "effort": _settings_value(cwd, "effortLevel")[0]}
+
+
+def _switched_to(state, key, current):
+    seen = (state.get("seen_settings") or {})
+    return current if current and key in seen and current != seen[key] else None
 
 
 def current_model(cfg, hook_input, state):
     cwd = hook_input.get("cwd")
-    settings_model, settings_mtime = _settings_value(cwd, "model")
-    last_model, last_ts = transcript.last_assistant_model(hook_input.get("transcript_path"))
-
-    if settings_model and settings_mtime > _iso_to_epoch(last_ts) and last_model:
-        return pricing.resolve_model(cfg, settings_model)  # switched since the last response
-    if os.environ.get("ANTHROPIC_MODEL"):
+    if os.environ.get("ANTHROPIC_MODEL"):  # overrides settings files
         return pricing.resolve_model(cfg, os.environ["ANTHROPIC_MODEL"])
+    settings_model = _settings_value(cwd, "model")[0]
+    switched = _switched_to(state, "model", settings_model)
+    if switched:
+        return pricing.resolve_model(cfg, switched)  # /model since the last response
+    last_model, _ = transcript.last_assistant_model(hook_input.get("transcript_path"))
     for candidate in (last_model, state.get("model_at_start"), settings_model):
         key = pricing.resolve_model(cfg, candidate)
         if key:
@@ -65,19 +67,19 @@ def current_model(cfg, hook_input, state):
 
 def current_effort(cfg, hook_input, state, model_key, prompt=""):
     cwd = hook_input.get("cwd")
+    levels = cfg["effort_levels"]
     if "ultrathink" in (prompt or "").lower():
         return "max"
     env = os.environ.get("CLAUDE_CODE_EFFORT_LEVEL")
-    if env in cfg["effort_levels"]:
+    if env in levels:
         return env
-    settings_effort, _ = _settings_value(cwd, "effortLevel")
-    if state.get("last_effort") in cfg["effort_levels"]:
-        # If settings changed after we last saw effort, the user ran /effort; prefer settings.
-        if settings_effort in cfg["effort_levels"] and settings_effort != state["last_effort"] \
-                and _settings_value(cwd, "effortLevel")[1] > state.get("last_effort_ts", 0):
-            return settings_effort
+    settings_effort = _settings_value(cwd, "effortLevel")[0]
+    switched = _switched_to(state, "effort", settings_effort)
+    if switched in levels:
+        return switched  # /effort since the last response
+    if state.get("last_effort") in levels:
         return state["last_effort"]
-    if settings_effort in cfg["effort_levels"]:
+    if settings_effort in levels:
         return settings_effort
     tier = pricing.tier_of(cfg, model_key)
     return cfg["default_effort_by_tier"].get(str(tier), "medium") if tier else None

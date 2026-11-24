@@ -1,10 +1,9 @@
 ---
-description: Pause Token Steward tips (default 4 hours). Use "off" to resume.
-argument-hint: "[hours|off]"
+description: Pause Token Steward tips for 4 hours (usage is still measured)
 model: haiku
 allowed-tools: Bash(python3:*)
 ---
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" snooze $ARGUMENTS`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" snooze 4`
 
 Repeat the line above to the user verbatim and nothing else.
 

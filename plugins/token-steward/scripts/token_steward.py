@@ -57,7 +57,7 @@ def run_snooze(arg):
     store.save_prefs(prefs)
     until = time.strftime("%a %H:%M", time.localtime(prefs["snooze_until"]))
     print(f"Token Steward tips paused until {until}. Usage is still recorded so your savings stay "
-          f"accurate. Resume early with /token-steward:snooze off")
+          f"accurate. Resume early with /token-steward:resume")
     return 0
 
 

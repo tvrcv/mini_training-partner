@@ -31,11 +31,15 @@
 
   function buildConfig(shared, policy) {
     const p = Object.assign({}, POLICY_DEFAULTS, policy || {});
-    const baseline = {
-      model: p.baselineModel || shared.baseline.model,
-      effort: p.baselineEffort || shared.baseline.effort
-    };
-    return Object.assign({}, shared, { policy: p, baseline: baseline });
+    // Resolve the reference model now, so a typo or unknown id in policy falls back to the
+    // shared default instead of breaking every price calculation later.
+    let model = p.baselineModel ? modelFromLabel(shared, p.baselineModel) : null;
+    if (p.baselineModel && !model && typeof console !== "undefined") {
+      console.warn("Token Steward: unknown baselineModel in policy, using the default:", p.baselineModel);
+    }
+    model = model || modelFromLabel(shared, shared.baseline.model);
+    const effort = shared.effort_levels.includes(p.baselineEffort) ? p.baselineEffort : shared.baseline.effort;
+    return Object.assign({}, shared, { policy: p, baseline: { model, effort } });
   }
 
   // ---- classification (port of classifier.py) -------------------------------------------
@@ -201,7 +205,7 @@
   // Price a finished chat turn and compare with the reference configuration.
   function priceTurn(cfg, { modelKey, effort, promptChars, historyChars, replyChars }) {
     const usage = estimateChatUsage(cfg, { promptChars, historyChars, replyChars, effort });
-    const baseKey = modelFromLabel(cfg, cfg.baseline.model) || cfg.baseline.model;
+    const baseKey = cfg.baseline.model;
     const actual = cost(cfg, modelKey, usage);
     const reference = counterfactualCost(cfg, usage, effort, baseKey, cfg.baseline.effort);
     return { usage, cost: actual, baselineCost: reference, savings: reference - actual, baseKey };

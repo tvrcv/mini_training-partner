@@ -5,6 +5,7 @@ effort, cost and the task class only. Prompts are reduced to a one-way hash when
 when) 'confirm' mode needs to recognise a re-submitted prompt.
 """
 
+import contextlib
 import json
 import os
 import tempfile
@@ -111,7 +112,29 @@ def load_totals():
     })
 
 
+@contextlib.contextmanager
+def _locked(name):
+    """Exclusive cross-process lock, so parallel sessions don't lose each other's updates."""
+    fh = open(data_dir() / f".{name}.lock", "a+")
+    try:
+        try:
+            import fcntl
+            fcntl.flock(fh, fcntl.LOCK_EX)
+        except ImportError:  # Windows
+            import msvcrt
+            fh.seek(0)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+        yield
+    finally:
+        fh.close()  # releases the lock
+
+
 def add_to_totals(record):
+    with _locked("totals"):
+        return _add_to_totals(record)
+
+
+def _add_to_totals(record):
     totals = load_totals()
     month = totals["by_month"].setdefault(
         month_key(record["ts"]), {"cost": 0.0, "baseline_cost": 0.0, "savings": 0.0, "turns": 0}

@@ -127,6 +127,7 @@ def on_session_start(cfg, inp):
     state = store.load_session(sid)
     if inp.get("model"):
         state["model_at_start"] = inp["model"]
+    state["seen_settings"] = detect.settings_snapshot(inp.get("cwd"))
     store.save_session(sid, state)
 
     if inp.get("source") not in (None, "startup"):
@@ -229,7 +230,8 @@ def on_stop(cfg, inp):
 
     effort = (inp.get("effort") or {}).get("level") or state.get("predicted_effort")
     if effort in cfg["effort_levels"]:
-        state["last_effort"], state["last_effort_ts"] = effort, time.time()
+        state["last_effort"] = effort
+    state["seen_settings"] = detect.settings_snapshot(inp.get("cwd"))
 
     base = cfg["baseline"]
     base_key = pricing.resolve_model(cfg, base["model"])

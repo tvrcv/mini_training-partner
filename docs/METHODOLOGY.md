@@ -26,7 +26,7 @@ The saving is `reference cost − actual cost`, where the reference is a fixed c
 
 Default multipliers (medium = 1.0): low 0.6 · medium 1.0 · high 1.5 · xhigh 2.0 · max 2.8.
 
-These multipliers are **planning assumptions**, deliberately conservative, and the only modelled part of the calculation. `/token-steward:savings --calibration` shows the median output tokens per task at each effort level from your own history. Those observed ratios mix effort with task difficulty (people choose high effort for harder work), so treat them as an upper bound when tuning.
+These multipliers are **planning assumptions**, deliberately conservative, and the only modelled part of the calculation. `/token-steward:calibration` shows the median output tokens per task at each effort level from your own history. Those observed ratios mix effort with task difficulty (people choose high effort for harder work), so treat them as an upper bound when tuning.
 
 The model-switch component involves no modelling: it's the same token counts at a different price. For a typical light task moved from Opus to Sonnet, most of the saving comes from that part.
 

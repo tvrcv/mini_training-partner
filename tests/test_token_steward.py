@@ -215,6 +215,25 @@ class HookFlowTests(unittest.TestCase):
         self.assertEqual(rows[0]["tokens"]["output"], 500)
         self.assertAlmostEqual(rows[0]["cost"], (1000 * 2 + 500 * 10) / 1e6, places=6)
 
+    def test_unrelated_settings_write_is_not_a_model_switch(self):
+        s = Session(settings={"model": "opus"})
+        s.hook("SessionStart", source="startup", model="claude-haiku-5-5")
+        s.turn("warm-up question about the deck", "claude-haiku-5-5", "low")
+        # A theme change rewrites settings.json without changing "model".
+        (s.home / ".claude" / "settings.json").write_text(json.dumps({"model": "opus", "theme": "dark"}))
+        s.hook("UserPromptSubmit", prompt="hello there")
+        state = json.loads((s.data / "sessions" / f"{s.sid}.json").read_text())
+        self.assertEqual(state["predicted_model"], "claude-haiku-5-5")
+
+    def test_real_model_switch_in_settings_is_detected(self):
+        s = Session(settings={"model": "haiku"})
+        s.hook("SessionStart", source="startup", model="claude-haiku-5-5")
+        s.turn("warm-up question about the deck", "claude-haiku-5-5", "low")
+        (s.home / ".claude" / "settings.json").write_text(json.dumps({"model": "opus"}))  # /model opus
+        s.hook("UserPromptSubmit", prompt="hello there")
+        state = json.loads((s.data / "sessions" / f"{s.sid}.json").read_text())
+        self.assertEqual(state["predicted_model"], "claude-opus-5-5")
+
     def test_fails_open_on_garbage(self):
         s = Session()
         res = subprocess.run([sys.executable, str(CLI), "hook", "stop"], input="not json",

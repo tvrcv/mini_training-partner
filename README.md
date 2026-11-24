@@ -28,7 +28,7 @@ $12.40 this month and $48.10 in total.
 | A task finishes on a lighter setup than the reference | A thank-you with that task's saving and running totals for the session, month and all time | Positive reinforcement, and a number people can quote |
 | `/token-steward:savings` | Personal dashboard: spend, counterfactual cost, savings, model mix, tips acted on | Self-awareness without a manager in the loop |
 | `/token-steward:guide` | The right-sizing playbook (a skill, so it also works in claude.ai chat) | One page anyone can follow |
-| `/token-steward:snooze [hours\|off]` | Pauses tips (default 4 hours) | Respects focus; usage is still measured |
+| `/token-steward:snooze` · `/token-steward:resume` | Pauses tips for 4 hours, or turns them back on | Respects focus; usage is still measured |
 | `/token-steward:export` | CSV of your usage ledger | For your own analysis or a firm-wide roll-up |
 
 For **claude.ai chat**, the [browser extension](extension/README.md) shows the same kind of tip while you type, before you send, and a thank-you with estimated savings after the reply.

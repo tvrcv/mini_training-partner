@@ -117,7 +117,8 @@
     function effortState() {
       const c = composer();
       const scope = c ? composerRoot(c) : document;
-      const el = first("effortControl", scope) || first("effortControl");
+      // Composer area only: a page-wide search could pick up "thinking" sections inside replies.
+      const el = first("effortControl", scope);
       if (!el) return null;
       const text = (el.innerText || "") + " " + (el.getAttribute("aria-label") || "");
       const level = text.match(EFFORT_RE);
@@ -130,8 +131,10 @@
     }
 
     function isStreaming() {
-      if (first("stopButton")) return true;
-      return !!document.querySelector('[data-is-streaming="true"]');
+      if (document.querySelector('[data-is-streaming="true"]')) return true;
+      const c = composer();
+      // Only a stop button next to the message box counts; other "Stop …" buttons on the page don't.
+      return !!(c && first("stopButton", composerRoot(c)));
     }
 
     function replyCount() { return all("assistantMessage").length; }
