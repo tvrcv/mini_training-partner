@@ -69,6 +69,8 @@ Severity is `2 × (model tier gap) + (effort level gap)` against the recommendat
 /plugin install token-steward@ai-stewardship
 ```
 
+**In this repository:** `.claude/settings.json` declares the marketplace and enables the plugin, so Claude Code offers to install Token Steward when you open the repository (after you trust the folder), and new cloud sessions on it can pick it up.
+
 **Firm-wide:** see [docs/ADMIN.md](docs/ADMIN.md) for Claude Code, and [docs/CLAUDE-AI.md](docs/CLAUDE-AI.md) for distributing through claude.ai organization settings to Cowork and chat. In short, push the marketplace and an enabled plugin through managed settings, then optionally set your own reference configuration, pricing and telemetry.
 
 Requires Python 3.8+ on `PATH` as `python3`. No third-party packages.
