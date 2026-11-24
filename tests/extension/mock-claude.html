@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- A minimal stand-in for claude.ai's chat page, shaped like the selectors dom.js looks for.
+     Used only by tests/extension/e2e.test.js; it is not a copy of claude.ai. -->
+<html><head><meta charset="utf-8"><title>mock chat</title>
+<style>body{font-family:sans-serif;margin:0;height:100vh;display:flex;flex-direction:column}
+#thread{flex:1;overflow:auto;padding:16px}fieldset{margin:16px;border:1px solid #ccc;border-radius:12px;padding:8px}
+.ProseMirror{min-height:40px;outline:none;padding:6px}</style></head>
+<body>
+<div id="thread"></div>
+<fieldset>
+  <div contenteditable="true" class="ProseMirror" role="textbox"></div>
+  <div>
+    <button data-testid="model-selector-dropdown" id="model">Opus 5.5</button>
+    <button aria-label="Extended thinking" aria-pressed="true" id="thinking">Thinking</button>
+    <button aria-label="Attach">+</button>
+    <button aria-label="Send message" id="send">Send</button>
+  </div>
+</fieldset>
+<script>
+const box = document.querySelector('.ProseMirror'), thread = document.getElementById('thread');
+window.sent = [];
+function send() {
+  const text = box.innerText.trim(); if (!text) return;
+  window.sent.push(text);
+  const u = document.createElement('div'); u.dataset.testid = 'user-message'; u.textContent = text; thread.append(u);
+  box.innerText = '';
+  const stop = document.createElement('button'); stop.setAttribute('aria-label', 'Stop response'); stop.textContent = 'Stop';
+  document.querySelector('fieldset div:last-child').append(stop);
+  const a = document.createElement('div'); a.setAttribute('data-is-streaming', 'true'); thread.append(a);
+  let n = 0; const iv = setInterval(() => {
+    a.textContent += 'Here is a more formal version of your text. ';
+    if (++n === 6) { clearInterval(iv); a.setAttribute('data-is-streaming', 'false'); stop.remove(); }
+  }, 150);
+}
+document.getElementById('send').addEventListener('click', send);
+box.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+</script>
+</body></html>

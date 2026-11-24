@@ -35,6 +35,10 @@ Chat loads the **guide** skill, so anyone can ask *"which model should I use for
 
 The plugin's `savings`, `snooze` and `export` commands also appear in chat (chat loads commands as skills). They need a local script, so in chat they reply with a short note to use Claude Code or Cowork instead.
 
-## 4. A note on what "saved" means in chat
+## 4. Tips in chat: the browser extension
+
+For tips in chat itself, deploy the [browser extension](../extension/README.md) to Chrome or Edge through enterprise policy. It shows the tip while someone types, before they send, and a thank-you with estimated savings after the reply. It covers claude.ai in the browser only, not the desktop or mobile apps, and its token counts are estimates from on-screen text.
+
+## 5. A note on what "saved" means in chat
 
 On Team and standard Enterprise seats, chat usage is mostly covered by the seat price. A lighter model there stretches people's usage limits rather than cutting the invoice. On usage-based plans it saves money directly. The browser extension has a setting for this (`costFraming`) so the message it shows matches how your firm actually pays.

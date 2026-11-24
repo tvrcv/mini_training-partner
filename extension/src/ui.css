@@ -1,0 +1,95 @@
+:host { all: initial; }
+
+.ts-tip, .ts-toast, .ts-dialog {
+  --ts-bg: #ffffff;
+  --ts-fg: #1f1f1d;
+  --ts-muted: #5e5d59;
+  --ts-border: #d9d6cc;
+  --ts-accent: #2f5d50;
+  --ts-accent-fg: #ffffff;
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ts-fg);
+  background: var(--ts-bg);
+  border: 1px solid var(--ts-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  .ts-tip, .ts-toast, .ts-dialog {
+    --ts-bg: #2b2a27;
+    --ts-fg: #ecebe6;
+    --ts-muted: #b4b2a9;
+    --ts-border: #45433e;
+    --ts-accent: #7fb8a4;
+    --ts-accent-fg: #1a1a18;
+  }
+}
+
+[hidden] { display: none !important; }
+
+.ts-brand {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ts-accent);
+  margin-bottom: 4px;
+}
+.ts-text strong { font-weight: 600; }
+
+.ts-tip {
+  position: fixed;
+  z-index: 2147483646;
+  padding: 12px 14px;
+  max-width: calc(100vw - 32px);
+}
+.ts-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+.ts-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ts-border);
+  background: transparent;
+  color: var(--ts-fg);
+  cursor: pointer;
+}
+.ts-btn:hover { border-color: var(--ts-muted); }
+.ts-btn:focus-visible, .ts-close:focus-visible { outline: 2px solid var(--ts-accent); outline-offset: 2px; }
+.ts-primary { background: var(--ts-accent); border-color: var(--ts-accent); color: var(--ts-accent-fg); }
+
+.ts-toast {
+  position: fixed;
+  z-index: 2147483646;
+  top: 16px;
+  right: 16px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 12px 36px 12px 14px;
+}
+.ts-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font: 18px/1 system-ui, sans-serif;
+  background: none;
+  border: 0;
+  color: var(--ts-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.ts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.ts-dialog { width: min(480px, 100%); padding: 18px 20px; }
+.ts-dialog h2 { font-size: 16px; margin: 0 0 8px; }
+.ts-dialog p { margin: 0; color: var(--ts-fg); }

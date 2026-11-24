@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "properties": {
+    "enabled": {"title": "Enabled", "description": "Turn Token Steward tips and thank-you messages on or off.", "type": "boolean"},
+    "mode": {"title": "Mode", "description": "'inline' shows a tip beside the message box and never blocks. 'confirm' additionally holds severe mismatches once on send.", "type": "string", "enum": ["inline", "confirm"]},
+    "costFraming": {"title": "Cost framing", "description": "'dollars' for usage-based billing; 'allowance' for seat-based plans, where a lighter model stretches usage limits rather than cutting the invoice.", "type": "string", "enum": ["dollars", "allowance"]},
+    "baselineModel": {"title": "Reference model", "description": "Model id savings are measured against, e.g. claude-opus-5-5.", "type": "string"},
+    "baselineEffort": {"title": "Reference effort", "description": "low, medium, high, xhigh or max.", "type": "string", "enum": ["low", "medium", "high", "xhigh", "max"]},
+    "minSeverity": {"title": "Tip threshold", "description": "2 x model-tier gap + effort-level gap needed before a tip shows.", "type": "integer"},
+    "confirmMinSeverity": {"title": "Confirm threshold", "type": "integer"},
+    "minMessagesBetweenTips": {"title": "Messages between tips", "type": "integer"},
+    "minMinutesBetweenTips": {"title": "Minutes between tips", "type": "integer"},
+    "maxTipsPerDay": {"title": "Max tips per day", "type": "integer"},
+    "stopAfterConsecutiveIgnored": {"title": "Back off after N ignored tips", "type": "integer"},
+    "thanksMinSavingsUsd": {"title": "Minimum saving to thank (USD)", "type": "number"},
+    "thanksMinMinutesBetween": {"title": "Minutes between thank-you messages", "type": "integer"},
+    "charsPerToken": {"title": "Characters per token (estimation)", "type": "number"},
+    "thinkingOffEffort": {"title": "Effort counted when extended thinking is off", "type": "string"},
+    "thinkingOnEffort": {"title": "Effort counted when extended thinking is on", "type": "string"},
+    "selectors": {
+      "title": "DOM selector overrides",
+      "description": "Hot-fix for claude.ai page changes without shipping a new version. Keys: composer, sendButton, stopButton, modelSelector, effortControl, assistantMessage, userMessage. Each value is a CSS selector string or list.",
+      "type": "object"
+    }
+  }
+}

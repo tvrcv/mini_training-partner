@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Token Steward for claude.ai",
+  "version": "1.0.0",
+  "description": "Suggests a right-sized Claude model and effort before light requests are sent, and shows the estimated savings.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["src/shared-config.js", "src/core.js", "src/dom.js", "src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {"resources": ["src/ui.css"], "matches": ["https://claude.ai/*"]}
+  ],
+  "action": {
+    "default_title": "Token Steward",
+    "default_popup": "popup/popup.html",
+    "default_icon": {"16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png"}
+  },
+  "icons": {"16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png"},
+  "storage": {"managed_schema": "managed_schema.json"}
+}

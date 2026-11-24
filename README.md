@@ -31,6 +31,8 @@ $12.40 this month and $48.10 in total.
 | `/token-steward:snooze [hours\|off]` | Pauses tips (default 4 hours) | Respects focus; usage is still measured |
 | `/token-steward:export` | CSV of your usage ledger | For your own analysis or a firm-wide roll-up |
 
+For **claude.ai chat**, the [browser extension](extension/README.md) shows the same kind of tip while you type, before you send, and a thank-you with estimated savings after the reply.
+
 ## Design principles
 
 The design follows from how we'd want a guardrail to behave for our own engineers:
@@ -83,6 +85,8 @@ plugins/token-steward/
 docs/ADMIN.md                          rollout guide for IT / AI enablement
 docs/METHODOLOGY.md                    exactly how costs and savings are computed
 docs/CLAUDE-AI.md                      Cowork and claude.ai chat
+extension/                             Chrome/Edge extension: tips and savings in claude.ai chat
+tools/build_extension_config.py        copies pricing/policy/classifier into the extension
 examples/                              managed-settings and org-policy templates
 tests/                                 end-to-end hook tests
 ```
@@ -90,8 +94,12 @@ tests/                                 end-to-end hook tests
 ## Development
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -v          # plugin
+node --test tests/extension/core.test.js          # extension logic (+ parity with the plugin classifier)
+node --test tests/extension/e2e.test.js           # extension in real Chromium (needs Playwright)
 ```
+
+After changing `plugins/token-steward/config/defaults.json`, run `python3 tools/build_extension_config.py` so the extension uses the same pricing and rules.
 
 Set `TOKEN_STEWARD_DEBUG=1` to see hook errors on stderr.
 

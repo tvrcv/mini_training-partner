@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 token-steward-usage.csv
+node_modules/
+token-steward-extension.zip

@@ -1,0 +1,14 @@
+{
+  "name": "token-steward",
+  "private": true,
+  "description": "Tests and tooling for the Token Steward plugin and claude.ai extension",
+  "scripts": {
+    "build:extension-config": "python3 tools/build_extension_config.py",
+    "test": "python3 -m unittest discover -s tests && node --test tests/extension/core.test.js",
+    "test:e2e": "node --test tests/extension/e2e.test.js",
+    "package:extension": "cd extension && zip -r ../token-steward-extension.zip . -x '.*'"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Token Steward</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Token Steward</h1>
+    <p class="sub" id="baseline"></p>
+  </header>
+  <section class="stats" aria-label="Savings">
+    <div class="stat"><span class="label">This month</span><span class="value" id="month">–</span></div>
+    <div class="stat"><span class="label">All time</span><span class="value" id="all">–</span></div>
+    <div class="stat"><span class="label">Replies tracked</span><span class="value" id="turns">–</span></div>
+    <div class="stat"><span class="label">Tips acted on</span><span class="value" id="tips">–</span></div>
+  </section>
+  <section>
+    <h2>Recent model mix</h2>
+    <table id="mix"><thead><tr><th>Model</th><th>Replies</th><th>Share</th></tr></thead><tbody></tbody></table>
+  </section>
+  <section class="actions">
+    <button type="button" id="snooze"></button>
+    <button type="button" id="export">Export CSV</button>
+  </section>
+  <section>
+    <h2>Rule of thumb</h2>
+    <ul class="guide">
+      <li><b>Haiku</b>, thinking off: rewording, formatting, translation, quick lookups</li>
+      <li><b>Sonnet</b>: summaries, drafting, everyday analysis and coding</li>
+      <li><b>Opus / Fable</b>: hard, multi-step problems where a wrong answer is costly</li>
+    </ul>
+  </section>
+  <footer id="note">Figures are estimates from on-screen text and list prices. Nothing you type is stored.</footer>
+  <script src="../src/shared-config.js"></script>
+  <script src="../src/core.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
