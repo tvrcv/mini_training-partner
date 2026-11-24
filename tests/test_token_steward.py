@@ -322,6 +322,25 @@ class HookFlowTests(unittest.TestCase):
         self.assertIn("pick Haiku in the model menu", p["systemMessage"])
         self.assertNotIn("/model", p["systemMessage"])
 
+    def test_commands_read_the_hooks_data(self):
+        """Slash commands don't get CLAUDE_PLUGIN_DATA; they must still see what the hooks recorded."""
+        s = Session()
+        s.data = s.home / ".claude" / "plugins" / "data" / "token-steward-synced"
+        s.turn("Summarise these meeting notes for the partner", "claude-haiku-5-5", "low")
+        bare = {k: v for k, v in s.env().items() if k != "CLAUDE_PLUGIN_DATA"}
+        run = lambda *a: subprocess.run([sys.executable, str(CLI), *a], capture_output=True, text=True,
+                                        env=bare, timeout=20).stdout  # noqa: E731
+        # As the commands call it: data folder passed explicitly.
+        self.assertIn("All time", run("--data-dir", str(s.data), "report"))
+        self.assertIn("| low |", run("--data-dir", str(s.data), "report", "--calibration"))
+        # Placeholder left unsubstituted, or no flag at all: found on disk.
+        self.assertIn("All time", run("--data-dir", "${CLAUDE_PLUGIN_DATA}", "report"))
+        self.assertIn("All time", run("report"))
+        # Snooze from a command must silence the hooks.
+        run("--data-dir", str(s.data), "snooze", "1")
+        p, _ = s.turn("Rephrase this email to the client so it sounds more formal", "claude-opus-5-5", "high")
+        self.assertEqual(p, {})
+
     def test_fails_open_on_garbage(self):
         s = Session()
         res = subprocess.run([sys.executable, str(CLI), "hook", "stop"], input="not json",

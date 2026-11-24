@@ -3,7 +3,7 @@ description: Show how much you've spent and saved by right-sizing model and effo
 model: haiku
 allowed-tools: Bash(python3:*)
 ---
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" report`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" --data-dir "${CLAUDE_PLUGIN_DATA}" report || python "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" --data-dir "${CLAUDE_PLUGIN_DATA}" report`
 
 Reproduce the report above exactly as written, as Markdown. Do not add commentary, analysis or advice before or after it.
 

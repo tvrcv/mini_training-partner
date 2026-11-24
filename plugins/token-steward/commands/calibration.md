@@ -3,7 +3,7 @@ description: Compare observed output tokens per effort level with Token Steward'
 model: haiku
 allowed-tools: Bash(python3:*)
 ---
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" report --calibration`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" --data-dir "${CLAUDE_PLUGIN_DATA}" report --calibration || python "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" --data-dir "${CLAUDE_PLUGIN_DATA}" report --calibration`
 
 Reproduce the table and note above exactly as written, as Markdown, with nothing added.
 

@@ -36,11 +36,28 @@ def load_config():
     return cfg
 
 
+def _find_plugin_data():
+    """The plugin data folder the hooks write to, for callers that weren't given it.
+
+    Hooks receive CLAUDE_PLUGIN_DATA; slash-command scripts may not. The folder is named after
+    the plugin's install id (e.g. token-steward-ai-stewardship, token-steward-synced), so look
+    for the most recently used one that holds Token Steward data.
+    """
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    root = Path(config_dir) / "plugins" / "data"
+    candidates = [d for d in root.glob("token-steward*") if (d / "totals.json").exists() or (d / "ledger.jsonl").exists()]
+    return max(candidates, key=lambda d: d.stat().st_mtime) if candidates else None
+
+
 def data_dir():
-    """Persistent per-user storage. CLAUDE_PLUGIN_DATA survives plugin updates."""
-    base = os.environ.get("CLAUDE_PLUGIN_DATA") or os.path.join(
-        os.path.expanduser("~"), ".claude", "token-steward"
-    )
+    """Persistent per-user storage. CLAUDE_PLUGIN_DATA survives plugin updates.
+
+    Order: TOKEN_STEWARD_DATA_DIR (set by --data-dir), CLAUDE_PLUGIN_DATA (hooks), the plugin's
+    data folder found on disk, then ~/.claude/token-steward.
+    """
+    base = (os.environ.get("TOKEN_STEWARD_DATA_DIR") or os.environ.get("CLAUDE_PLUGIN_DATA")
+            or _find_plugin_data()
+            or os.path.join(os.path.expanduser("~"), ".claude", "token-steward"))
     path = Path(base)
     path.mkdir(parents=True, exist_ok=True)
     return path

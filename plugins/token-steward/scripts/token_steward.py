@@ -62,6 +62,13 @@ def run_snooze(arg):
 
 
 def main(argv):
+    # Slash commands pass the hooks' data folder explicitly, so both read and write the same place.
+    if "--data-dir" in argv:
+        i = argv.index("--data-dir")
+        value = argv[i + 1] if i + 1 < len(argv) else ""
+        argv = argv[:i] + argv[i + 2:]
+        if value and "${" not in value:
+            os.environ["TOKEN_STEWARD_DATA_DIR"] = value
     if len(argv) >= 2 and argv[0] == "hook" and argv[1] in HANDLERS:
         return run_hook(argv[1])
     cfg = config.load_config()

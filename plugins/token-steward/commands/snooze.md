@@ -3,7 +3,7 @@ description: Pause Token Steward tips for 4 hours (usage is still measured)
 model: haiku
 allowed-tools: Bash(python3:*)
 ---
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" snooze 4`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" --data-dir "${CLAUDE_PLUGIN_DATA}" snooze 4 || python "${CLAUDE_PLUGIN_ROOT}/scripts/token_steward.py" --data-dir "${CLAUDE_PLUGIN_DATA}" snooze 4`
 
 Repeat the line above to the user verbatim and nothing else.
 
