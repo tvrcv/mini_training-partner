@@ -27,7 +27,7 @@ $12.40 this month and $48.10 in total.
 | A light request runs on a heavy setup | A short tip naming the current setup, a right-sized alternative, the estimated saving, and the exact command to switch | Feedback at the moment of decision is what changes habits |
 | A task finishes on a lighter setup than the reference | A thank-you with that task's saving and running totals for the session, month and all time | Positive reinforcement, and a number people can quote |
 | `/token-steward:savings` | Personal dashboard: spend, counterfactual cost, savings, model mix, tips acted on | Self-awareness without a manager in the loop |
-| `/token-steward:guide` | The right-sizing playbook | One page anyone can follow |
+| `/token-steward:guide` | The right-sizing playbook (a skill, so it also works in claude.ai chat) | One page anyone can follow |
 | `/token-steward:snooze [hours\|off]` | Pauses tips (default 4 hours) | Respects focus; usage is still measured |
 | `/token-steward:export` | CSV of your usage ledger | For your own analysis or a firm-wide roll-up |
 
@@ -64,7 +64,7 @@ Severity is `2 × (model tier gap) + (effort level gap)` against the recommendat
 /plugin install token-steward@ai-stewardship
 ```
 
-**Firm-wide:** see [docs/ADMIN.md](docs/ADMIN.md). In short, push the marketplace and an enabled plugin through managed settings, then optionally set your own reference configuration, pricing and telemetry.
+**Firm-wide:** see [docs/ADMIN.md](docs/ADMIN.md) for Claude Code, and [docs/CLAUDE-AI.md](docs/CLAUDE-AI.md) for distributing through claude.ai organization settings to Cowork and chat. In short, push the marketplace and an enabled plugin through managed settings, then optionally set your own reference configuration, pricing and telemetry.
 
 Requires Python 3.8+ on `PATH` as `python3`. No third-party packages.
 
@@ -75,12 +75,14 @@ Requires Python 3.8+ on `PATH` as `python3`. No third-party packages.
 plugins/token-steward/
   .claude-plugin/plugin.json
   hooks/hooks.json                     SessionStart, UserPromptSubmit, Stop
-  commands/                            savings, guide, snooze, export
+  commands/                            savings, snooze, export
+  skills/guide/                        right-sizing playbook (loads in Claude Code, Cowork and chat)
   config/defaults.json                 pricing, policy, classifier signals (all tunable)
   scripts/token_steward.py             entry point
   scripts/steward/                     classifier, detection, pricing, transcript, ledger, reports
 docs/ADMIN.md                          rollout guide for IT / AI enablement
 docs/METHODOLOGY.md                    exactly how costs and savings are computed
+docs/CLAUDE-AI.md                      Cowork and claude.ai chat
 examples/                              managed-settings and org-policy templates
 tests/                                 end-to-end hook tests
 ```
@@ -95,7 +97,7 @@ Set `TOKEN_STEWARD_DEBUG=1` to see hook errors on stderr.
 
 ## Scope and limits
 
-- Works where Claude Code plugin hooks run: the CLI, the desktop app's Code tab and the IDE extensions. Chat-only surfaces don't run hooks.
+- Tips and savings need plugin hooks, which run in Claude Code and Cowork. claude.ai chat ignores hooks: there the plugin provides the guide skill, and the optional browser extension provides tips. See [docs/CLAUDE-AI.md](docs/CLAUDE-AI.md).
 - The tip fires *as* a prompt is submitted, so it shapes the **next** request rather than the current one. That's deliberate: holding a prompt would slow people down. Admins who want a stronger nudge for egregious cases can enable `confirm` mode (see ADMIN).
 - Subagent token usage is recorded in separate transcripts and isn't yet counted.
 - The classifier is a heuristic. It will sometimes miss light work, and occasionally flag something that deserved the bigger model. Tune `classifier.signals` for your firm's vocabulary.
