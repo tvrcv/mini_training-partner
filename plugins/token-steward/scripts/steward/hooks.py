@@ -10,6 +10,7 @@ Design rules that every handler follows:
 import getpass
 import hashlib
 import json
+import os
 import socket
 import time
 import urllib.request
@@ -26,6 +27,20 @@ CLASS_PHRASES = {
 
 
 # ---- helpers ---------------------------------------------------------------------------------
+
+def _switch_model(cfg, tier):
+    """How to move to a tier here. Cloud sessions (claude.ai/code) don't take /model shortcuts,
+    so there we point at the model menu instead."""
+    if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
+        return f"pick {cfg['tier_names'][str(tier)]} in the model menu under the message box"
+    return cfg["tier_commands"][str(tier)]
+
+
+def _switch_effort(effort):
+    if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
+        return f"set effort to {effort} in the same menu"
+    return f"/effort {effort}"
+
 
 def _severity(cfg, model_key, effort, rec):
     model_gap = max(0, pricing.tier_of(cfg, model_key) - rec["tier"])
@@ -85,9 +100,9 @@ def _build_nudge(cfg, state, task_class, matched, model_key, effort, rec, model_
     target = f"{pricing.label_of(cfg, rec_model)}" + (f" at {rec_effort} effort" if rec_effort else "")
     steps = []
     if model_gap:
-        steps.append(cfg["tier_commands"][str(rec["tier"])])
+        steps.append(_switch_model(cfg, rec["tier"]))
     if effort_gap:
-        steps.append(f"/effort {rec_effort}")
+        steps.append(_switch_effort(rec_effort))
 
     msg = (f"{PREFIX}This looks like {what}. You're on {current}, which is built for complex, "
            f"multi-step work. {target} typically handles requests like this just as well")
@@ -138,9 +153,9 @@ def _build_upgrade(cfg, matched, model_key, effort, model_gap, effort_gap):
     better = pricing.label_of(cfg, rec_model) + (f" at {target['effort']} effort" if effort_gap else "")
     steps = []
     if model_gap:
-        steps.append(cfg["tier_commands"][str(target["tier"])])
+        steps.append(_switch_model(cfg, target["tier"]))
     if effort_gap:
-        steps.append(f"/effort {target['effort']}")
+        steps.append(_switch_effort(target["effort"]))
     return (f"{PREFIX}This looks like {what}. You're on {current}. For work like this, {better} usually "
             f"gets it right first time, which costs less than several retries. To switch: "
             f"{' then '.join(steps)}. Your request is running as-is.")

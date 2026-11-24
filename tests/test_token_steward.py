@@ -39,7 +39,8 @@ class Session:
 
     def env(self):
         env = {k: v for k, v in os.environ.items()
-               if k not in ("ANTHROPIC_MODEL", "CLAUDE_CODE_EFFORT_LEVEL", "TOKEN_STEWARD_CONFIG")}
+               if k not in ("ANTHROPIC_MODEL", "CLAUDE_CODE_EFFORT_LEVEL", "TOKEN_STEWARD_CONFIG",
+                            "CLAUDE_CODE_REMOTE")}
         env.update(HOME=str(self.home), CLAUDE_PLUGIN_DATA=str(self.data), TOKEN_STEWARD_DEBUG="1")
         return env
 
@@ -310,6 +311,16 @@ class HookFlowTests(unittest.TestCase):
         finally:
             os.environ.clear()
             os.environ.update(old)
+
+    def test_cloud_sessions_point_at_the_model_menu(self):
+        s = Session()
+        env = s.env()
+        env["CLAUDE_CODE_REMOTE"] = "true"
+        s.env = lambda: env
+        s.turn("warm-up question about the deck", "claude-opus-5-5", "high")
+        p = s.hook("UserPromptSubmit", prompt="Rephrase this email to the client so it sounds more formal")
+        self.assertIn("pick Haiku in the model menu", p["systemMessage"])
+        self.assertNotIn("/model", p["systemMessage"])
 
     def test_fails_open_on_garbage(self):
         s = Session()
