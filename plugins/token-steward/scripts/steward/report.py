@@ -39,7 +39,7 @@ def _usage_report(cfg, rows, totals, base_label):
               "|---|---:|---:|---:|---:|"]
     for name, rs in periods:
         tokens = sum(plan_usage.total_tokens(r.get("tokens") or {}) for r in rs)
-        right = sum(1 for r in rs if r.get("savings", 0) > 0)
+        right = sum(1 for r in rs if plan_usage.is_right_sized(cfg, r))
         cost = sum(r["cost"] for r in rs)
         base = sum(r["baseline_cost"] for r in rs)
         ratio = f"{base / cost:.1f}\u00d7 lighter" if cost > 0 and base / cost >= 1.05 else "about the same"

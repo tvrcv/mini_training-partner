@@ -72,6 +72,9 @@
     "concise_hint_for_trivial": false
   },
 
+  "_right_sized_comment": "A task counts as right-sized (thank-yous, weekly counts, milestones) only when it ran at least this many times lighter than the reference setup, estimated as for every comparison. 1.5 means Opus at medium effort (about 1.1x lighter than Opus at high) doesn't count; Sonnet or Haiku for the same work does.",
+  "right_sized_min_ratio": 1.5,
+
   "upgrade": {
     "_comment": "Right-sizing goes both ways: when a request looks like complex, multi-step work on a light setup, suggest moving up. A first answer that is right costs less than several retries, and it shows people the tool is on their side.",
     "enabled": true,

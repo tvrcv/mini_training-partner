@@ -399,6 +399,18 @@ class HookFlowTests(unittest.TestCase):
         self.assertIn("Sonnet 5.5", out)
         self.assertIn("limits appear after the first reply", out)
 
+    def test_right_sized_needs_a_meaningful_difference(self):
+        s = Session()
+        # Opus at medium is only ~1.1x lighter than the Opus-at-high reference: not right-sized, no thanks.
+        _, stop = s.turn("Summarise these notes for the partner", "claude-opus-5-5", "medium")
+        self.assertEqual(stop, {})
+        self.assertFalse(s.ledger()[-1]["right_sized"])
+        # Sonnet at medium is well over 1.5x lighter: right-sized and thanked.
+        _, stop = s.turn("Summarise this memo for the partner", "claude-sonnet-5-5", "medium")
+        self.assertTrue(s.ledger()[-1]["right_sized"])
+        self.assertIn("Right-sized tasks in the last 7 days: 1.", stop["systemMessage"])
+        self.assertIn("| 2 | 1 |", s.cli("report"))
+
     def test_fails_open_on_garbage(self):
         s = Session()
         res = subprocess.run([sys.executable, str(CLI), "hook", "stop"], input="not json",

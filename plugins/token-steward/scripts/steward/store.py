@@ -144,7 +144,7 @@ def _add_to_totals(record):
         bucket["baseline_cost"] += record["baseline_cost"]
         bucket["savings"] += max(record["savings"], 0.0)
         bucket["turns"] += 1
-        bucket["right_sized"] = bucket.get("right_sized", 0) + (1 if record["savings"] > 0 else 0)
+        bucket["right_sized"] = bucket.get("right_sized", 0) + (1 if record.get("right_sized", record["savings"] > 0) else 0)
     totals["nudges_shown"] += 1 if record.get("nudged") else 0
     totals["nudges_accepted"] += 1 if record.get("nudge_accepted") else 0
     _write_json(data_dir() / "totals.json", totals)

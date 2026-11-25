@@ -9,7 +9,7 @@ By default (`"framing": "usage"`) Token Steward talks about tokens and plan limi
 | Tokens per task | `usage` on each assistant response in the session transcript: input, output (including reasoning), cache writes and cache reads | Measured |
 | Session and weekly limit used, and reset times | Claude Code's `rate_limits` (`five_hour`, `seven_day`), which it passes only to the status line, for Pro, Max and Ultra plans. `/token-steward:setup-statusline` saves each update to `~/.claude/token-steward/limits.json`; tips use it while it is under 12 hours old and its window hasn't reset | Measured |
 | "About N× less of your usage limit" | The ratio of the same tokens priced on the two setups (section 2). Anthropic says model and effort affect how fast limits are used but publishes no weights, so relative price is the proxy | Estimated, and labelled so |
-| Right-sized task | A task that ran lighter than the reference setup | Measured against the reference |
+| Right-sized task | A task that ran at least 1.5× lighter than the reference setup (`right_sized_min_ratio`), so Opus at medium effort against an Opus-at-high reference (about 1.1×) doesn't count, while Sonnet or Haiku for the same work does | Estimated, using the same comparison |
 
 Each ledger row also records the limit percentages at the time, so a firm can later check the price-based estimate against how limits actually moved.
 

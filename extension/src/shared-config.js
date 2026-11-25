@@ -278,6 +278,7 @@ globalThis.TOKEN_STEWARD_SHARED = {
   "min_gap": 2,
   "max_per_session": 2
  },
+ "right_sized_min_ratio": 1.5,
  "celebrations": {
   "enabled": true,
   "milestones_usd": [

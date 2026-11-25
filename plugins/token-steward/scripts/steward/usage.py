@@ -66,6 +66,14 @@ def limits_sentence(limits=None):
     return "You've used " + " and ".join(bits) + "."
 
 
+def is_right_sized(cfg, row):
+    """A task that ran meaningfully lighter than the reference (cfg right_sized_min_ratio, default 1.5x)."""
+    if "right_sized" in row:
+        return bool(row["right_sized"])
+    cost, base = row.get("cost", 0) or 0, row.get("baseline_cost", 0) or 0
+    return cost > 0 and base / cost >= cfg.get("right_sized_min_ratio", 1.5)
+
+
 def tokens_text(n):
     n = int(n or 0)
     if n >= 1_000_000:

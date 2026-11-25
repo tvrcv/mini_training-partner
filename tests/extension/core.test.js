@@ -85,7 +85,7 @@ test("extension config is in sync with the plugin's defaults.json", () => {
     path.join(ROOT, "plugins/token-steward/config/defaults.json"), "utf8"));
   const shared = globalThis.TOKEN_STEWARD_SHARED;
   const strip = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k.startsWith("_") ? undefined : v)));
-  for (const key of ["pricing", "baseline", "recommendations", "classifier", "effort_output_multiplier", "upgrade", "celebrations"]) {
+  for (const key of ["pricing", "baseline", "recommendations", "classifier", "effort_output_multiplier", "upgrade", "celebrations", "right_sized_min_ratio"]) {
     assert.deepStrictEqual(shared[key], strip(defaults[key]),
       `${key} differs: run python3 tools/build_extension_config.py`);
   }

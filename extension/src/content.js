@@ -244,6 +244,8 @@
       baseline_cost: +priced.baselineCost.toFixed(6), savings: +priced.savings.toFixed(6),
       tipped: t.tipped, tip_accepted: t.accepted
     };
+    // Right-sized = meaningfully lighter than the reference, not merely a little.
+    row.right_sized = priced.cost > 0 && priced.baselineCost / priced.cost >= (cfg.right_sized_min_ratio || 1.5);
     return mutate((st) => {
       st.ledger.push(row);
       if (st.ledger.length > LEDGER_MAX) st.ledger.splice(0, st.ledger.length - LEDGER_MAX);
@@ -253,14 +255,15 @@
       for (const b of [tot.allTime, m]) {
         b.cost += row.cost; b.baseline += row.baseline_cost; b.savings += Math.max(0, row.savings); b.turns += 1;
       }
-      if (row.savings > 0) tot.allTime.rightSized = before.rightSized + 1;
+      if (row.right_sized) tot.allTime.rightSized = before.rightSized + 1;
 
       const p = cfg.policy, s = st.state;
       if (!p.enabled || snoozed()) return;
       const milestone = celebrationFor(before, tot, t.accepted);
       const cooled = now - (s.lastThanksTs || 0) >= p.thanksMinMinutesBetween * 60000;
-      if (milestone || (row.savings >= p.thanksMinSavingsUsd && (t.accepted || cooled))) {
-        const thanks = row.savings > 0 ? Core.thanksText(cfg, priced, t.modelKey, t.effort,
+      const worthThanking = p.costFraming === "dollars" ? row.savings >= p.thanksMinSavingsUsd : row.right_sized;
+      if (milestone || (worthThanking && (t.accepted || cooled))) {
+        const thanks = worthThanking ? Core.thanksText(cfg, priced, t.modelKey, t.effort,
           { month: m.savings, allTime: tot.allTime.savings }, t.accepted, !!milestone) : "";
         ui.toast(milestone ? milestone.text + " " + thanks : thanks, { milestone: !!milestone, big: milestone && milestone.big });
         if (milestone && p.celebrations) ui.confetti(milestone.big);

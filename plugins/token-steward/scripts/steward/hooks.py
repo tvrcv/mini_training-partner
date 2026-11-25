@@ -201,7 +201,7 @@ def on_session_start(cfg, inp):
     week_ago = time.time() - 7 * 86400
     week = [r for r in store.read_ledger_tail() if r.get("ts", 0) >= week_ago]
     week_saved = sum(max(r.get("savings", 0.0), 0.0) for r in week)
-    light = sum(1 for r in week if r.get("savings", 0) > 0)
+    light = sum(1 for r in week if plan_usage.is_right_sized(cfg, r))
     model_key = pricing.resolve_model(cfg, inp.get("model"))
     msg = (f"{PREFIX}Match the model to the task: Haiku for quick edits and lookups, Sonnet for "
            f"everyday drafting and coding, Opus or Fable for genuinely hard problems.")
@@ -363,6 +363,8 @@ def on_stop(cfg, inp):
         "nudged": bool(state.get("nudged_this_turn")),
         "nudge_accepted": accepted,
     }
+    record["right_sized"] = plan_usage.is_right_sized(cfg, record)
+    right_sized = record["right_sized"]
     limits = plan_usage.read_limits()
     if limits:
         record["limits_pct"] = {k: round(v["used_percentage"], 1) for k, v in limits.items()}
@@ -376,7 +378,8 @@ def on_stop(cfg, inp):
     money = lambda x: pricing.fmt_money(cfg, x)  # noqa: E731
     cel = cfg.get("celebrations") or {}
     celebration = ""
-    if cel.get("enabled", True) and savings > 0:
+    dollars = plan_usage.framing(cfg) == "dollars"
+    if cel.get("enabled", True) and (savings > 0 if dollars else right_sized):
         if plan_usage.framing(cfg) == "dollars":
             after = totals["all_time"]["savings"]
             reached = milestone_crossed(cel.get("milestones_usd", []), after - savings, after)
@@ -393,7 +396,8 @@ def on_stop(cfg, inp):
 
     th = cfg.get("thanks") or {}
     cooled = now - state.get("last_thanks_ts", 0) >= th.get("min_minutes_between_messages", 15) * 60
-    if th.get("enabled", True) and not store.is_snoozed() and savings >= th.get("min_turn_savings_usd", 0.01) \
+    worth_thanking = savings >= th.get("min_turn_savings_usd", 0.01) if dollars else right_sized
+    if th.get("enabled", True) and not store.is_snoozed() and worth_thanking \
             and (accepted or cooled or celebration):
         month = totals["by_month"].get(store.month_key(now), {}).get("savings", 0.0)
         opener = "" if celebration else "Thanks for switching, and for considering your usage. " if accepted \
@@ -409,7 +413,7 @@ def on_stop(cfg, inp):
             ratio = baseline_cost / cost if cost > 0 else None
             week_ago = now - 7 * 86400
             right_week = sum(1 for r in store.read_ledger_tail() if r.get("ts", 0) >= week_ago
-                             and r.get("savings", 0) > 0)
+                             and plan_usage.is_right_sized(cfg, r))
             msg = (f"{PREFIX}{celebration}{opener}This task used {plan_usage.tokens_text(plan_usage.total_tokens(totals_usage))} "
                    f"on {setup}")
             if plan_usage.ratio_text(ratio):
