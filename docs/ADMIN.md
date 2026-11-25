@@ -6,6 +6,9 @@ Audience: IT, AI enablement, and whoever owns the AI budget.
 
 This repository is a Claude Code plugin marketplace. Host it (or a fork) somewhere your people's machines can reach: an internal GitHub org works well. Fork it if you want to change defaults in `plugins/token-steward/config/defaults.json` rather than ship an override file.
 
+
+**Releasing an update:** bump `version` in `plugins/token-steward/.claude-plugin/plugin.json` (and in `extension/manifest.json` for the extension) with every change you want people to get. Claude Code treats the version as pinned: installed and synced copies stay on the old code until the number changes.
+
 ## 2. Enable it for everyone with managed settings
 
 Add the marketplace and enable the plugin in your managed settings, through server-managed settings in the claude.ai admin console, MDM, or a `managed-settings.json` file. A starting point is in [`examples/managed-settings.json`](../examples/managed-settings.json):

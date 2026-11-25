@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Token Steward for claude.ai",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "Suggests a right-sized Claude model and effort before light requests are sent, and shows the estimated savings.",
   "permissions": ["storage"],
   "content_scripts": [
